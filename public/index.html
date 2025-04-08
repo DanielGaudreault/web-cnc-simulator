@@ -1,52 +1,21 @@
-const McamParser = require('./core/McamParser');
-const ThreeDViewer = require('./viewer/ThreeDViewer');
-
-class MCAMApplication {
-  constructor() {
-    this.viewer = new ThreeDViewer('viewer-container');
-    this.fileInput = document.getElementById('mcam-file-input');
-    
-    this.setupEventListeners();
-  }
-
-  setupEventListeners() {
-    this.fileInput.addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        this.loadFile(file);
-      }
-    });
-  }
-
-  async loadFile(file) {
-    try {
-      const buffer = await this.readFileAsBuffer(file);
-      const parser = new McamParser(buffer);
-      const result = parser.parse();
-      
-      if (result.success) {
-        this.viewer.loadGeometry(result.geometry);
-        this.viewer.loadToolpaths(result.toolpaths);
-        console.log('Machine Settings:', result.machineSettings);
-      } else {
-        console.error('Error parsing file:', result.error);
-      }
-    } catch (error) {
-      console.error('File loading error:', error);
-    }
-  }
-
-  readFileAsBuffer(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-  }
-}
-
-// Initialize application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  new MCAMApplication();
-});
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MCAM Browser Viewer</title>
+  <style>
+    #viewer { width: 100%; height: 100vh; }
+    body { margin: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <input type="file" id="file-input" accept=".mcam" />
+  <div id="viewer"></div>
+  
+  <!-- Load Three.js directly from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- Load our modules as ES modules -->
+  <script type="module" src="main.js"></script>
+</body>
+</html>
