@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MCAM Viewer - No Installation Required</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #viewer-container { width: 100vw; height: 100vh; }
+    #file-input { 
+      position: absolute; 
+      top: 20px; 
+      left: 20px; 
+      z-index: 100;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="file-input" accept=".mcam" />
+  <div id="viewer-container"></div>
+
+  <!-- Load Three.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  
+  <!-- Load our components -->
+  <script src="orbit-controls.js"></script>
+  <script src="mcam-parser.js"></script>
+  <script src="three-viewer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
