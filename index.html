@@ -139,79 +139,39 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* ===== CONTEXT MENU ===== */
-        .context-menu {
+        /* ===== ERROR MESSAGE ===== */
+        .error-message {
             position: absolute;
-            z-index: 1000;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            padding: 5px 0;
-            min-width: 150px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            z-index: 300;
+            max-width: 80%;
+            text-align: center;
             display: none;
-        }
-
-        .context-menu-item {
-            padding: 8px 15px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .context-menu-item:hover {
-            background-color: #f0f0f0;
-        }
-
-        /* ===== MEASUREMENT TOOL ===== */
-        .measurement-line {
-            position: absolute;
-            background-color: rgba(74, 144, 226, 0.7);
-            height: 2px;
-            transform-origin: 0 0;
-            z-index: 101;
-            pointer-events: none;
-        }
-
-        .measurement-label {
-            position: absolute;
-            background: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 12px;
-            z-index: 101;
-            pointer-events: none;
-            border: 1px solid #4a90e2;
-        }
-
-        /* ===== RESPONSIVE ADJUSTMENTS ===== */
-        @media (max-width: 768px) {
-            .toolbar {
-                top: auto;
-                bottom: 20px;
-                right: 20px;
-                flex-direction: column;
-            }
-            
-            .info-panel {
-                max-width: calc(100% - 40px);
-            }
         }
     </style>
 </head>
 <body>
     <div id="viewer-container">
-        <input type="file" id="file-input" accept=".mcam" />
+        <input type="file" id="file-input" accept=".mcam,.mcx,.gcode" />
         
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
-            <div id="loading-text">Processing MCAM File...</div>
+            <div id="loading-text">Processing File...</div>
         </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="error-message"></div>
 
         <!-- Toolbar -->
         <div class="toolbar">
             <button class="tool-button" id="view-toggle">Toggle Wireframe</button>
-            <button class="tool-button" id="measure-tool">Measure</button>
             <button class="tool-button" id="reset-view">Reset View</button>
         </div>
 
@@ -227,18 +187,14 @@
                 <span id="file-size">0 MB</span>
             </div>
             <div class="info-item">
+                <span class="info-label">File Type:</span>
+                <span id="file-type">Unknown</span>
+            </div>
+            <div class="info-item">
                 <span class="info-label">Entities:</span>
                 <span id="entity-count">0</span>
             </div>
-            <div class="info-item">
-                <span class="info-label">Toolpaths:</span>
-                <span id="toolpath-count">0</span>
-            </div>
         </div>
-
-        <!-- Measurement Elements -->
-        <div id="measurement-line" class="measurement-line" style="display: none;"></div>
-        <div id="measurement-label" class="measurement-label" style="display: none;"></div>
     </div>
 
     <!-- Three.js from CDN -->
@@ -247,7 +203,7 @@
 
     <script>
         // ==============================================
-        // MCAM Parser Class
+        // Enhanced MCAM Parser with Error Handling
         // ==============================================
         class McamParser {
             constructor(buffer) {
@@ -255,13 +211,20 @@
                 this.dataView = new DataView(buffer);
                 this.offset = 0;
                 this.littleEndian = true;
+                this.supportedVersions = [1, 2, 3];
             }
 
             parse() {
                 try {
+                    this.checkFileSize();
                     const header = this.parseHeader();
-                    const geometry = this.parseGeometry();
-                    const toolpaths = this.parseToolpaths();
+                    
+                    if (!this.supportedVersions.includes(header.version)) {
+                        throw new Error(`Unsupported MCAM version ${header.version}. Supported: ${this.supportedVersions.join(', ')}`);
+                    }
+
+                    const geometry = this.parseGeometry(header.version);
+                    const toolpaths = this.parseToolpaths(header.version);
                     
                     return {
                         success: true,
@@ -277,52 +240,79 @@
                 }
             }
 
+            checkFileSize() {
+                if (this.buffer.byteLength < 16) {
+                    throw new Error('File too small (minimum 16 bytes required)');
+                }
+            }
+
             parseHeader() {
                 const magic = this.readString(4);
-                if (magic !== 'MCAM') throw new Error('Invalid MCAM file format');
+                if (!['MCAM', 'MMC2'].includes(magic)) {
+                    throw new Error(`Invalid file header. Expected 'MCAM' or 'MMC2', got '${magic}'`);
+                }
+                
+                const version = this.readUint32();
+                const fileSize = this.readUint32();
+                
+                if (fileSize !== this.buffer.byteLength) {
+                    throw new Error(`File size mismatch. Header: ${fileSize} bytes, Actual: ${this.buffer.byteLength} bytes`);
+                }
                 
                 return {
-                    version: this.readUint32(),
-                    creationDate: new Date(this.readUint64() / 10000 - 11644473600000), // Convert Windows ticks to JS Date
+                    version,
+                    fileSize,
+                    creationDate: this.readUint64(),
                     units: this.readByte() === 0 ? 'mm' : 'inch'
                 };
             }
 
-            parseGeometry() {
-                const vertexCount = this.readUint32();
-                const vertices = new Float32Array(vertexCount * 3);
-                
-                for (let i = 0; i < vertexCount; i++) {
-                    vertices[i * 3] = this.readFloat();
-                    vertices[i * 3 + 1] = this.readFloat();
-                    vertices[i * 3 + 2] = this.readFloat();
+            parseGeometry(version) {
+                try {
+                    const vertexCount = this.readUint32();
+                    if (vertexCount > 1000000) throw new Error('Excessive vertex count');
+                    
+                    const vertices = new Float32Array(vertexCount * 3);
+                    for (let i = 0; i < vertexCount; i++) {
+                        vertices[i * 3] = this.readFloat();
+                        vertices[i * 3 + 1] = this.readFloat();
+                        vertices[i * 3 + 2] = this.readFloat();
+                    }
+
+                    const faceCount = this.readUint32();
+                    if (faceCount > 2000000) throw new Error('Excessive face count');
+                    
+                    const faces = new Uint32Array(faceCount * 3);
+                    for (let i = 0; i < faceCount; i++) {
+                        faces[i * 3] = this.readUint32();
+                        faces[i * 3 + 1] = this.readUint32();
+                        faces[i * 3 + 2] = this.readUint32();
+                    }
+
+                    return { vertices, faces };
+                } catch (error) {
+                    throw new Error(`Geometry parsing failed: ${error.message}`);
                 }
-                
-                const faceCount = this.readUint32();
-                const faces = new Uint32Array(faceCount * 3);
-                
-                for (let i = 0; i < faceCount; i++) {
-                    faces[i * 3] = this.readUint32();
-                    faces[i * 3 + 1] = this.readUint32();
-                    faces[i * 3 + 2] = this.readUint32();
-                }
-                
-                return { vertices, faces };
             }
 
-            parseToolpaths() {
+            parseToolpaths(version) {
                 const pathCount = this.readUint16();
                 const toolpaths = [];
                 
                 for (let i = 0; i < pathCount; i++) {
-                    toolpaths.push(this.readToolpath());
+                    try {
+                        toolpaths.push({
+                            toolNumber: this.readUint16(),
+                            points: this.readPathPoints()
+                        });
+                    } catch (error) {
+                        console.warn(`Skipping toolpath ${i}: ${error.message}`);
+                    }
                 }
-                
                 return toolpaths;
             }
 
-            readToolpath() {
-                const toolNumber = this.readUint16();
+            readPathPoints() {
                 const pointCount = this.readUint32();
                 const points = [];
                 
@@ -334,14 +324,10 @@
                         feedRate: this.readFloat()
                     });
                 }
-                
-                return {
-                    toolNumber,
-                    points
-                };
+                return points;
             }
 
-            // Helper methods for binary reading
+            // Binary reading helpers
             readUint32() {
                 const value = this.dataView.getUint32(this.offset, this.littleEndian);
                 this.offset += 4;
@@ -367,7 +353,6 @@
             }
 
             readUint64() {
-                // Split 64-bit into two 32-bit numbers
                 const left = this.readUint32();
                 const right = this.readUint32();
                 return left + 2**32 * right;
@@ -390,37 +375,24 @@
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(
-                    75, 
-                    this.container.clientWidth / this.container.clientHeight, 
-                    0.1, 
-                    1000
-                );
+                this.camera = new THREE.PerspectiveCamera(75, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
-                this.controls = null;
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.wireframeMode = false;
-                this.measurementToolActive = false;
-                this.measurementPoints = [];
-                this.raycaster = new THREE.Raycaster();
-                this.mouse = new THREE.Vector2();
                 
                 this.init();
             }
 
             init() {
                 // Renderer setup
-                this.renderer.setSize(
-                    this.container.clientWidth, 
-                    this.container.clientHeight
-                );
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
                 this.renderer.setClearColor(0xf0f0f0);
                 this.container.appendChild(this.renderer.domElement);
                 
                 // Camera position
-                this.camera.position.set(0, 0, 50);
+                this.camera.position.z = 50;
                 
                 // Controls
-                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.controls.enableDamping = true;
                 this.controls.dampingFactor = 0.25;
                 
@@ -432,13 +404,9 @@
                 directionalLight.position.set(1, 1, 1);
                 this.scene.add(directionalLight);
                 
-                // Grid helper
-                const gridHelper = new THREE.GridHelper(100, 100);
-                this.scene.add(gridHelper);
-                
-                // Axes helper
-                const axesHelper = new THREE.AxesHelper(10);
-                this.scene.add(axesHelper);
+                // Helpers
+                this.scene.add(new THREE.GridHelper(100, 100));
+                this.scene.add(new THREE.AxesHelper(10));
                 
                 // Animation loop
                 this.animate();
@@ -456,28 +424,18 @@
             onWindowResize() {
                 this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
                 this.camera.updateProjectionMatrix();
-                this.renderer.setSize(
-                    this.container.clientWidth, 
-                    this.container.clientHeight
-                );
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
             }
 
             loadGeometry(geometryData) {
-                // Clear previous geometry
                 this.clearSceneExceptHelpers();
                 
-                // Create new geometry
                 const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute(
-                    'position', 
-                    new THREE.BufferAttribute(geometryData.vertices, 3)
-                );
-                geometry.setIndex(
-                    new THREE.BufferAttribute(geometryData.faces, 1)
-                );
+                geometry.setAttribute('position', new THREE.BufferAttribute(geometryData.vertices, 3));
+                geometry.setIndex(new THREE.BufferAttribute(geometryData.faces, 1));
                 geometry.computeVertexNormals();
                 
-                const material = new THREE.MeshPhongMaterial({ 
+                const material = new THREE.MeshPhongMaterial({
                     color: 0x2194ce,
                     specular: 0x111111,
                     shininess: 30,
@@ -487,22 +445,15 @@
                 
                 const mesh = new THREE.Mesh(geometry, material);
                 this.scene.add(mesh);
-                
-                // Auto-zoom to fit
                 this.zoomToObject(mesh);
             }
 
             renderToolpaths(toolpaths) {
-                // Remove old toolpaths
-                this.scene.children
-                    .filter(obj => obj.userData.isToolpath)
-                    .forEach(obj => this.scene.remove(obj));
+                this.scene.children.filter(obj => obj.userData.isToolpath).forEach(obj => this.scene.remove(obj));
                 
-                // Add new toolpaths
                 toolpaths.forEach(toolpath => {
                     const points = toolpath.points.map(p => new THREE.Vector3(p.x, p.y, p.z));
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                    
                     const material = new THREE.LineBasicMaterial({
                         color: this.getToolColor(toolpath.toolNumber),
                         linewidth: 2
@@ -549,103 +500,27 @@
                 });
             }
 
-            enableMeasurementTool() {
-                if (this.measurementToolActive) {
-                    this.disableMeasurementTool();
-                    return;
-                }
-
-                this.measurementToolActive = true;
-                this.measurementPoints = [];
-                this.renderer.domElement.style.cursor = 'crosshair';
-                
-                // Show measurement UI elements
-                document.getElementById('measurement-line').style.display = 'none';
-                document.getElementById('measurement-label').style.display = 'none';
-                
-                // Add click handler
-                this.renderer.domElement.addEventListener('click', this.measurementClickHandler.bind(this));
-            }
-
-            disableMeasurementTool() {
-                this.measurementToolActive = false;
-                this.measurementPoints = [];
-                this.renderer.domElement.style.cursor = '';
-                
-                // Hide measurement UI elements
-                document.getElementById('measurement-line').style.display = 'none';
-                document.getElementById('measurement-label').style.display = 'none';
-                
-                // Remove click handler
-                this.renderer.domElement.removeEventListener('click', this.measurementClickHandler.bind(this));
-            }
-
-            measurementClickHandler(event) {
-                // Get mouse position in normalized device coordinates
-                this.mouse.x = (event.clientX / this.renderer.domElement.clientWidth) * 2 - 1;
-                this.mouse.y = -(event.clientY / this.renderer.domElement.clientHeight) * 2 + 1;
-                
-                // Update the raycaster
-                this.raycaster.setFromCamera(this.mouse, this.camera);
-                
-                // Find intersections with the model
-                const intersects = this.raycaster.intersectObjects(
-                    this.scene.children.filter(obj => obj.isMesh)
-                );
-                
-                if (intersects.length > 0) {
-                    const point = intersects[0].point;
-                    this.measurementPoints.push(point);
-                    
-                    if (this.measurementPoints.length === 2) {
-                        this.drawMeasurement();
-                        this.measurementPoints = [];
-                    }
-                }
-            }
-
-            drawMeasurement() {
-                const point1 = this.measurementPoints[0];
-                const point2 = this.measurementPoints[1];
-                
-                // Calculate distance between points
-                const distance = point1.distanceTo(point2);
-                
-                // Convert 3D points to 2D screen coordinates
-                const screenPoint1 = point1.clone().project(this.camera);
-                const screenPoint2 = point2.clone().project(this.camera);
-                
-                // Convert to CSS coordinates
-                const x1 = (screenPoint1.x * 0.5 + 0.5) * this.renderer.domElement.clientWidth;
-                const y1 = -(screenPoint1.y * 0.5 - 0.5) * this.renderer.domElement.clientHeight;
-                const x2 = (screenPoint2.x * 0.5 + 0.5) * this.renderer.domElement.clientWidth;
-                const y2 = -(screenPoint2.y * 0.5 - 0.5) * this.renderer.domElement.clientHeight;
-                
-                // Calculate line length and angle
-                const lineLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-                
-                // Position the line and label
-                const line = document.getElementById('measurement-line');
-                const label = document.getElementById('measurement-label');
-                
-                line.style.width = `${lineLength}px`;
-                line.style.left = `${x1}px`;
-                line.style.top = `${y1}px`;
-                line.style.transform = `rotate(${angle}deg)`;
-                line.style.display = 'block';
-                
-                label.textContent = `${distance.toFixed(2)} units`;
-                label.style.left = `${(x1 + x2) / 2}px`;
-                label.style.top = `${(y1 + y2) / 2}px`;
-                label.style.display = 'block';
-            }
-
             resetView() {
                 this.controls.reset();
                 this.camera.position.set(0, 0, 50);
                 this.controls.update();
             }
+        }
+
+        // ==============================================
+        // File Format Detection
+        // ==============================================
+        function detectFileFormat(buffer) {
+            if (buffer.byteLength < 4) return 'UNKNOWN';
+            
+            const header = new Uint8Array(buffer.slice(0, 4));
+            const headerStr = String.fromCharCode(...header);
+            
+            if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
+            if (headerStr.startsWith('%')) return 'GCODE';
+            if (headerStr === 'STL\x00' || headerStr === 'solid') return 'STL';
+            
+            return 'UNKNOWN';
         }
 
         // ==============================================
@@ -655,36 +530,36 @@
             const viewer = new ThreeDViewer('viewer-container');
             const fileInput = document.getElementById('file-input');
             const viewToggleBtn = document.getElementById('view-toggle');
-            const measureToolBtn = document.getElementById('measure-tool');
             const resetViewBtn = document.getElementById('reset-view');
-            
-            // UI Control Functions
+            const errorMessage = document.getElementById('error-message');
+
+            // UI Functions
             function showLoading(message) {
-                const overlay = document.getElementById('loading-overlay');
-                const text = document.getElementById('loading-text');
-                text.textContent = message;
-                overlay.style.display = 'flex';
+                document.getElementById('loading-text').textContent = message;
+                document.getElementById('loading-overlay').style.display = 'flex';
             }
 
             function hideLoading() {
                 document.getElementById('loading-overlay').style.display = 'none';
             }
 
-            function updateFileInfo(file, parsedData) {
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                setTimeout(() => errorMessage.style.display = 'none', 5000);
+            }
+
+            function updateFileInfo(file, format, data) {
                 document.getElementById('file-name').textContent = file.name;
-                document.getElementById('file-size').textContent = 
-                    `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+                document.getElementById('file-size').textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+                document.getElementById('file-type').textContent = format;
                 
-                if (parsedData.geometry) {
-                    const vertexCount = parsedData.geometry.vertices.length / 3;
-                    const faceCount = parsedData.geometry.faces.length / 3;
-                    document.getElementById('entity-count').textContent = 
-                        `${vertexCount} vertices, ${faceCount} faces`;
-                }
-                
-                if (parsedData.toolpaths) {
-                    document.getElementById('toolpath-count').textContent = 
-                        `${parsedData.toolpaths.length} paths`;
+                if (data?.geometry) {
+                    const vertexCount = data.geometry.vertices.length / 3;
+                    const faceCount = data.geometry.faces.length / 3;
+                    document.getElementById('entity-count').textContent = `${vertexCount} vertices, ${faceCount} faces`;
+                } else {
+                    document.getElementById('entity-count').textContent = 'N/A';
                 }
             }
 
@@ -692,7 +567,7 @@
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
+                    reader.onerror = () => reject(new Error('Failed to read file'));
                     reader.readAsArrayBuffer(file);
                 });
             }
@@ -706,24 +581,26 @@
                 
                 try {
                     const arrayBuffer = await readFileAsArrayBuffer(file);
-                    const parser = new McamParser(arrayBuffer);
-                    const result = parser.parse();
+                    const format = detectFileFormat(arrayBuffer);
                     
-                    if (result.success) {
-                        updateFileInfo(file, result);
+                    if (format === 'MCAM') {
+                        const parser = new McamParser(arrayBuffer);
+                        const result = parser.parse();
                         
-                        if (result.geometry) {
+                        if (result.success) {
+                            updateFileInfo(file, 'MCAM', result);
                             viewer.loadGeometry(result.geometry);
-                        }
-                        if (result.toolpaths) {
-                            viewer.renderToolpaths(result.toolpaths);
+                            if (result.toolpaths) viewer.renderToolpaths(result.toolpaths);
+                        } else {
+                            throw new Error(result.error);
                         }
                     } else {
-                        throw new Error(result.error);
+                        throw new Error(`Unsupported file format: ${format}. Please upload an MCAM file.`);
                     }
                 } catch (error) {
-                    console.error('Error processing file:', error);
-                    alert('Failed to process MCAM file: ' + error.message);
+                    console.error('Error:', error);
+                    showError(error.message);
+                    updateFileInfo(file, 'Error', null);
                 } finally {
                     hideLoading();
                 }
@@ -732,11 +609,6 @@
             viewToggleBtn.addEventListener('click', () => {
                 viewer.toggleWireframeMode();
                 viewToggleBtn.classList.toggle('active');
-            });
-
-            measureToolBtn.addEventListener('click', () => {
-                viewer.enableMeasurementTool();
-                measureToolBtn.classList.toggle('active');
             });
 
             resetViewBtn.addEventListener('click', () => {
