@@ -1,58 +1,42 @@
-const MathUtils = require('../utilities/MathUtils');
+import * as tf from '@tensorflow/tfjs';
 
-class ToolpathOptimizer {
-  constructor(toolpaths, machineSettings) {
-    this.toolpaths = toolpaths;
-    this.machine = machineSettings;
-    this.optimizedPaths = [];
+class ToolpathOptimizerAI {
+  constructor() {
+    this.model = null;
+    this.loadModel();
   }
 
-  optimize() {
-    this.toolpaths.forEach(path => {
-      const optimized = this.processPath(path);
-      this.optimizedPaths.push(optimized);
-    });
-    return this.optimizedPaths;
+  async loadModel() {
+    this.model = await tf.loadLayersModel('models/toolpath-optimizer/model.json');
   }
 
-  processPath(path) {
-    // Apply feed rate optimization
-    if (this.machine.maxFeedRate) {
-      path.feedRate = Math.min(path.feedRate, this.machine.maxFeedRate);
-    }
+  async optimize(toolpath, materialProperties) {
+    // Convert toolpath to tensor
+    const inputTensor = this.prepareInput(toolpath, materialProperties);
     
-    // Smooth toolpath
-    path.positions = this.applySmoothing(path.positions);
+    // Predict optimized parameters
+    const prediction = this.model.predict(inputTensor);
+    const results = await prediction.data();
     
-    // Optimize rapid moves
-    path = this.optimizeRapidMoves(path);
-    
-    return path;
+    return {
+      feedRate: results[0],
+      spindleSpeed: results[1],
+      stepover: results[2]
+    };
   }
 
-  applySmoothing(points, tolerance = 0.01) {
-    return MathUtils.ramerDouglasPeucker(points, tolerance);
-  }
-
-  optimizeRapidMoves(path) {
-    // Detect rapid move sequences and optimize
-    const optimized = [];
-    let rapidSequence = [];
+  prepareInput(toolpath, material) {
+    // Feature engineering for the AI model
+    const features = [
+      toolpath.length,
+      toolpath.complexity,
+      material.hardness,
+      material.toughness,
+      toolpath.toolDiameter
+    ];
     
-    path.positions.forEach((point, i) => {
-      if (point.isRapidMove) {
-        rapidSequence.push(point);
-      } else {
-        if (rapidSequence.length > 0) {
-          optimized.push(...this.optimizeRapidSequence(rapidSequence));
-          rapidSequence = [];
-        }
-        optimized.push(point);
-      }
-    });
-    
-    return { ...path, positions: optimized };
+    return tf.tensor2d([features]);
   }
 }
 
-module.exports = ToolpathOptimizer;
+export default ToolpathOptimizerAI;
