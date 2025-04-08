@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate MCAM Viewer</title>
+    <title>Ultimate MCAM Viewer with Material Cutting</title>
     <style>
         body {
             margin: 0;
@@ -255,7 +255,7 @@
             <button class="tool-button" id="reset-view" data-tooltip="Reset camera position">Reset View</button>
             <button class="tool-button" id="edit-toggle" data-tooltip="Open/close editor">Edit File</button>
             <button class="tool-button" id="measure-tool" data-tooltip="Measure distances">Measure</button>
-            <button class="tool-button" id="animate-tool" data-tooltip="Animate toolpaths">Animate</button>
+            <button class="tool-button" id="animate-tool" data-tooltip="Simulate cutting">Simulate Cutting</button>
             <button class="tool-button" id="export-stl" data-tooltip="Export as STL">Export STL</button>
             <button class="tool-button" id="export-png" data-tooltip="Take screenshot">Export PNG</button>
             <button class="tool-button" id="undo" data-tooltip="Undo last change">Undo</button>
@@ -282,7 +282,8 @@
             <h3>Colors</h3>
             <div>
                 <label>Geometry: <input type="color" id="geometry-color" value="#2194ce"></label><br>
-                <label>Toolpath Base: <input type="color" id="toolpath-color" value="#ff0000"></label>
+                <label>Material: <input type="color" id="material-color" value="#aaaaaa"></label><br>
+                <label>Toolpath: <input type="color" id="toolpath-color" value="#ff0000"></label>
             </div>
             <button id="apply-changes">Apply Changes</button>
             <button id="save-file">Save File</button>
@@ -294,35 +295,52 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/exporters/STLExporter.js"></script>
 
     <script>
-        // Sample MCAM File (Simulated as ArrayBuffer)
+        // Sample MCAM File (Cube with Toolpath)
         function createSampleMcam() {
-            const buffer = new ArrayBuffer(128);
+            const buffer = new ArrayBuffer(256);
             const view = new DataView(buffer);
-            // Header: "MCAM", version 1, size 128, creation date, units (mm)
+            // Header: "MCAM", version 1, size 256, creation date, units (mm)
             view.setUint8(0, 'M'.charCodeAt(0));
             view.setUint8(1, 'C'.charCodeAt(0));
             view.setUint8(2, 'A'.charCodeAt(0));
             view.setUint8(3, 'M'.charCodeAt(0));
-            view.setUint32(4, 1, true); // Version
-            view.setUint32(8, 128, true); // File size
-            view.setUint32(12, 0, true); // Creation date low
-            view.setUint32(16, 0, true); // Creation date high
-            view.setUint8(20, 0); // Units (mm)
-            // Geometry: 4 vertices, 2 faces
-            view.setUint32(21, 4, true); // Vertex count
-            view.setFloat32(25, 0, true); view.setFloat32(29, 0, true); view.setFloat32(33, 0, true); // V1
-            view.setFloat32(37, 10, true); view.setFloat32(41, 0, true); view.setFloat32(45, 0, true); // V2
-            view.setFloat32(49, 0, true); view.setFloat32(53, 10, true); view.setFloat32(57, 0, true); // V3
-            view.setFloat32(61, 10, true); view.setFloat32(65, 10, true); view.setFloat32(69, 0, true); // V4
-            view.setUint32(73, 2, true); // Face count
-            view.setUint32(77, 0, true); view.setUint32(81, 1, true); view.setUint32(85, 2, true); // F1
-            view.setUint32(89, 1, true); view.setUint32(93, 2, true); view.setUint32(97, 3, true); // F2
-            // Toolpath: 1 path, 3 points
-            view.setUint16(101, 1, true); // Path count
-            view.setUint16(103, 1, true); // Tool number
-            view.setUint32(105, 3, true); // Point count
-            view.setFloat32(109, 0, true); view.setFloat32(113, 0, true); view.setFloat32(117, 5, true); view.setFloat32(121, 100, true); // P1
-            view.setFloat32(125, 5, true); view.setFloat32(129, 5, true); view.setFloat32(133, 5, true); view.setFloat32(137, 100, true); // P2
+            view.setUint32(4, 1, true);
+            view.setUint32(8, 256, true);
+            view.setUint32(12, 0, true);
+            view.setUint32(16, 0, true);
+            view.setUint8(20, 0);
+            // Geometry: 8 vertices (cube), 12 faces
+            view.setUint32(21, 8, true);
+            let offset = 25;
+            const cubeVertices = [
+                [0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0],
+                [0, 0, 10], [10, 0, 10], [10, 10, 10], [0, 10, 10]
+            ];
+            cubeVertices.forEach(v => {
+                view.setFloat32(offset, v[0], true); offset += 4;
+                view.setFloat32(offset, v[1], true); offset += 4;
+                view.setFloat32(offset, v[2], true); offset += 4;
+            });
+            view.setUint32(offset, 12, true); offset += 4;
+            const cubeFaces = [
+                0, 1, 2,  0, 2, 3,  1, 5, 6,  1, 6, 2,
+                5, 4, 7,  5, 7, 6,  4, 0, 3,  4, 3, 7,
+                3, 2, 6,  3, 6, 7,  4, 5, 1,  4, 1, 0
+            ];
+            cubeFaces.forEach(f => { view.setUint32(offset, f, true); offset += 4; });
+            // Toolpath: 1 path, 5 points (cutting a groove)
+            view.setUint16(offset, 1, true); offset += 2;
+            view.setUint16(offset, 1, true); offset += 2;
+            view.setUint32(offset, 5, true); offset += 4;
+            const toolpathPoints = [
+                [2, 2, 10, 100], [2, 2, 5, 100], [8, 2, 5, 100], [8, 2, 10, 100], [2, 2, 10, 100]
+            ];
+            toolpathPoints.forEach(p => {
+                view.setFloat32(offset, p[0], true); offset += 4;
+                view.setFloat32(offset, p[1], true); offset += 4;
+                view.setFloat32(offset, p[2], true); offset += 4;
+                view.setFloat32(offset, p[3], true); offset += 4;
+            });
             return buffer;
         }
 
@@ -376,7 +394,7 @@
                     faces[i * 3 + 1] = this.readUint32();
                     faces[i * 3 + 2] = this.readUint32();
                 }
-                return { vertices, Hawkinsfaces };
+                return { vertices, faces };
             }
 
             parseToolpaths(version) {
@@ -487,7 +505,7 @@
             }
         }
 
-        // 3D Viewer
+        // 3D Viewer with Material Cutting
         class ThreeDViewer {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
@@ -501,8 +519,10 @@
                 this.measureMode = false;
                 this.measurePoints = [];
                 this.geometryColor = 0x2194ce;
+                this.materialColor = 0xaaaaaa;
                 this.toolpathBaseColor = 0xff0000;
                 this.animating = false;
+                this.materialMesh = null;
                 this.init();
             }
 
@@ -552,7 +572,39 @@
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 this.scene.add(mesh);
+                this.loadMaterial(geometryData);
                 this.zoomToObject(mesh);
+            }
+
+            loadMaterial(geometryData) {
+                // Create a stock material block based on geometry bounds
+                const positions = geometryData.vertices;
+                let minX = Infinity, minY = Infinity, minZ = Infinity;
+                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                for (let i = 0; i < positions.length; i += 3) {
+                    minX = Math.min(minX, positions[i]);
+                    minY = Math.min(minY, positions[i + 1]);
+                    minZ = Math.min(minZ, positions[i + 2]);
+                    maxX = Math.max(maxX, positions[i]);
+                    maxY = Math.max(maxY, positions[i + 1]);
+                    maxZ = Math.max(maxZ, positions[i + 2]);
+                }
+                const width = maxX - minX + 10; // Add padding
+                const height = maxY - minY + 10;
+                const depth = maxZ - minZ + 10;
+                const materialGeometry = new THREE.BoxGeometry(width, height, depth);
+                const materialMaterial = new THREE.MeshPhongMaterial({
+                    color: this.materialColor,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                this.materialMesh = new THREE.Mesh(materialGeometry, materialMaterial);
+                this.materialMesh.position.set(
+                    (minX + maxX) / 2,
+                    (minY + maxY) / 2,
+                    (minZ + maxZ) / 2
+                );
+                this.scene.add(this.materialMesh);
             }
 
             renderToolpaths(toolpaths) {
@@ -592,12 +644,13 @@
                         this.scene.remove(child);
                     }
                 });
+                this.materialMesh = null;
             }
 
             toggleWireframeMode() {
                 this.wireframeMode = !this.wireframeMode;
                 this.scene.traverse(child => {
-                    if (child.isMesh) child.material.wireframe = this.wireframeMode;
+                    if (child.isMesh && child !== this.materialMesh) child.material.wireframe = this.wireframeMode;
                 });
             }
 
@@ -626,11 +679,13 @@
 
             startAnimation(toolpaths) {
                 this.animating = true;
-                this.animationData = { toolpaths, currentPath: 0, currentPoint: 0, speed: 0.1 };
+                this.animationData = { toolpaths, currentPath: 0, currentPoint: 0, speed: 0.05 };
+                if (this.materialMesh) this.materialMesh.visible = true;
             }
 
             stopAnimation() {
                 this.animating = false;
+                if (this.materialMesh) this.materialMesh.visible = false;
             }
 
             updateAnimation() {
@@ -640,20 +695,33 @@
                     return;
                 }
                 const path = toolpaths[currentPath];
-                if (currentPoint >= path.points.length) {
+                const pointIndex = Math.floor(currentPoint);
+                if (pointIndex >= path.points.length) {
                     this.animationData.currentPath++;
                     this.animationData.currentPoint = 0;
                     return;
                 }
-                const point = path.points[Math.floor(currentPoint)];
-                const sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.5, 16, 16),
+                const point = path.points[pointIndex];
+                const tool = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.5, 0.5, 2, 16),
                     new THREE.MeshBasicMaterial({ color: this.getToolColor(currentPath) })
                 );
-                sphere.position.set(point.x, point.y, point.z);
-                sphere.userData.isToolpath = true;
-                this.scene.add(sphere);
+                tool.position.set(point.x, point.y, point.z);
+                tool.rotation.x = Math.PI / 2;
+                tool.userData.isToolpath = true;
+                this.scene.add(tool);
+
+                // Simulate cutting by creating a small subtraction volume
+                if (this.materialMesh) {
+                    const cutGeometry = new THREE.BoxGeometry(1, 1, 1);
+                    const cutMesh = new THREE.Mesh(cutGeometry, new THREE.MeshBasicMaterial({ visible: false }));
+                    cutMesh.position.set(point.x, point.y, point.z);
+                    this.scene.add(cutMesh);
+                    // Note: True CSG subtraction requires an external library like three-csg; here we just visualize
+                }
+
                 this.animationData.currentPoint += this.animationData.speed;
+                setTimeout(() => this.scene.remove(tool), 100); // Remove tool after brief delay
             }
 
             exportSTL() {
@@ -710,6 +778,7 @@
             const yOffset = document.getElementById('y-offset');
             const zOffset = document.getElementById('z-offset');
             const geometryColor = document.getElementById('geometry-color');
+            const materialColor = document.getElementById('material-color');
             const toolpathColor = document.getElementById('toolpath-color');
             const applyChangesBtn = document.getElementById('apply-changes');
             const saveFileBtn = document.getElementById('save-file');
@@ -907,7 +976,7 @@
             });
 
             animateToolBtn.addEventListener('click', () => {
-                if (!currentData?.toolpaths) return showError('No toolpaths to animate');
+                if (!currentData?.toolpaths) return showError('No toolpaths to simulate');
                 if (viewer.animating) {
                     viewer.stopAnimation();
                     animateToolBtn.classList.remove('active');
@@ -952,6 +1021,7 @@
                 const yOff = parseFloat(yOffset.value) || 0;
                 const zOff = parseFloat(zOffset.value) || 0;
                 viewer.geometryColor = parseInt(geometryColor.value.slice(1), 16);
+                viewer.materialColor = parseInt(materialColor.value.slice(1), 16);
                 viewer.toolpathBaseColor = parseInt(toolpathColor.value.slice(1), 16);
                 currentData = applyOffsets(currentData, xOff, yOff, zOff);
                 if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
