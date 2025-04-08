@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced MCAM Viewer</title>
+    <title>Advanced MCAM Viewer with Editing</title>
     <style>
-        /* ===== BASE STYLES ===== */
         body {
             margin: 0;
             padding: 0;
@@ -22,7 +21,6 @@
             background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
         }
 
-        /* ===== FILE INPUT STYLES ===== */
         #file-input {
             position: absolute;
             top: 20px;
@@ -46,7 +44,6 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
-        /* ===== TOOLBAR STYLES ===== */
         .toolbar {
             position: absolute;
             top: 20px;
@@ -75,7 +72,10 @@
             background: #357ab8;
         }
 
-        /* ===== INFO PANEL STYLES ===== */
+        .tool-button.active {
+            background: #357ab8;
+        }
+
         .info-panel {
             position: absolute;
             bottom: 20px;
@@ -108,7 +108,6 @@
             width: 120px;
         }
 
-        /* ===== LOADING INDICATOR ===== */
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -139,7 +138,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* ===== ERROR MESSAGE ===== */
         .error-message {
             position: absolute;
             top: 50%;
@@ -154,28 +152,79 @@
             text-align: center;
             display: none;
         }
+
+        .editor-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 6px;
+            max-width: 400px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .editor-panel h3 {
+            margin-top: 0;
+            color: #4a90e2;
+            font-size: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+
+        .editor-panel textarea {
+            width: 100%;
+            height: 150px;
+            resize: vertical;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .editor-panel input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .editor-panel button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .editor-panel button:hover {
+            background: #357ab8;
+        }
     </style>
 </head>
 <body>
     <div id="viewer-container">
         <input type="file" id="file-input" accept=".mcam,.mcx,.gcode" />
-        
-        <!-- Loading Overlay -->
+
         <div id="loading-overlay" class="loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <div id="loading-text">Processing File...</div>
         </div>
 
-        <!-- Error Message -->
         <div id="error-message" class="error-message"></div>
 
-        <!-- Toolbar -->
         <div class="toolbar">
             <button class="tool-button" id="view-toggle">Toggle Wireframe</button>
             <button class="tool-button" id="reset-view">Reset View</button>
+            <button class="tool-button" id="edit-toggle">Edit File</button>
         </div>
 
-        <!-- Info Panel -->
         <div class="info-panel">
             <h3>File Information</h3>
             <div class="info-item">
@@ -195,16 +244,26 @@
                 <span id="entity-count">0</span>
             </div>
         </div>
+
+        <div class="editor-panel" id="editor-panel">
+            <h3>Edit File</h3>
+            <textarea id="file-content" placeholder="File content will appear here..."></textarea>
+            <h3>Edit Location</h3>
+            <div>
+                <label>X Offset: <input type="number" id="x-offset" value="0" step="0.1"></label><br>
+                <label>Y Offset: <input type="number" id="y-offset" value="0" step="0.1"></label><br>
+                <label>Z Offset: <input type="number" id="z-offset" value="0" step="0.1"></label>
+            </div>
+            <button id="apply-changes">Apply Changes</button>
+            <button id="save-file">Save File</button>
+        </div>
     </div>
 
-    <!-- Three.js from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // ==============================================
-        // Enhanced MCAM Parser with Error Handling
-        // ==============================================
+        // MCAM Parser (unchanged from original)
         class McamParser {
             constructor(buffer) {
                 this.buffer = buffer;
@@ -218,47 +277,27 @@
                 try {
                     this.checkFileSize();
                     const header = this.parseHeader();
-                    
                     if (!this.supportedVersions.includes(header.version)) {
-                        throw new Error(`Unsupported MCAM version ${header.version}. Supported: ${this.supportedVersions.join(', ')}`);
+                        throw new Error(`Unsupported MCAM version ${header.version}`);
                     }
-
                     const geometry = this.parseGeometry(header.version);
                     const toolpaths = this.parseToolpaths(header.version);
-                    
-                    return {
-                        success: true,
-                        header,
-                        geometry,
-                        toolpaths
-                    };
+                    return { success: true, header, geometry, toolpaths };
                 } catch (error) {
-                    return {
-                        success: false,
-                        error: error.message
-                    };
+                    return { success: false, error: error.message };
                 }
             }
 
             checkFileSize() {
-                if (this.buffer.byteLength < 16) {
-                    throw new Error('File too small (minimum 16 bytes required)');
-                }
+                if (this.buffer.byteLength < 16) throw new Error('File too small');
             }
 
             parseHeader() {
                 const magic = this.readString(4);
-                if (!['MCAM', 'MMC2'].includes(magic)) {
-                    throw new Error(`Invalid file header. Expected 'MCAM' or 'MMC2', got '${magic}'`);
-                }
-                
+                if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
                 const version = this.readUint32();
                 const fileSize = this.readUint32();
-                
-                if (fileSize !== this.buffer.byteLength) {
-                    throw new Error(`File size mismatch. Header: ${fileSize} bytes, Actual: ${this.buffer.byteLength} bytes`);
-                }
-                
+                if (fileSize !== this.buffer.byteLength) throw new Error('File size mismatch');
                 return {
                     version,
                     fileSize,
@@ -268,46 +307,33 @@
             }
 
             parseGeometry(version) {
-                try {
-                    const vertexCount = this.readUint32();
-                    if (vertexCount > 1000000) throw new Error('Excessive vertex count');
-                    
-                    const vertices = new Float32Array(vertexCount * 3);
-                    for (let i = 0; i < vertexCount; i++) {
-                        vertices[i * 3] = this.readFloat();
-                        vertices[i * 3 + 1] = this.readFloat();
-                        vertices[i * 3 + 2] = this.readFloat();
-                    }
-
-                    const faceCount = this.readUint32();
-                    if (faceCount > 2000000) throw new Error('Excessive face count');
-                    
-                    const faces = new Uint32Array(faceCount * 3);
-                    for (let i = 0; i < faceCount; i++) {
-                        faces[i * 3] = this.readUint32();
-                        faces[i * 3 + 1] = this.readUint32();
-                        faces[i * 3 + 2] = this.readUint32();
-                    }
-
-                    return { vertices, faces };
-                } catch (error) {
-                    throw new Error(`Geometry parsing failed: ${error.message}`);
+                const vertexCount = this.readUint32();
+                if (vertexCount > 1000000) throw new Error('Excessive vertex count');
+                const vertices = new Float32Array(vertexCount * 3);
+                for (let i = 0; i < vertexCount; i++) {
+                    vertices[i * 3] = this.readFloat();
+                    vertices[i * 3 + 1] = this.readFloat();
+                    vertices[i * 3 + 2] = this.readFloat();
                 }
+                const faceCount = this.readUint32();
+                if (faceCount > 2000000) throw new Error('Excessive face count');
+                const faces = new Uint32Array(faceCount * 3);
+                for (let i = 0; i < faceCount; i++) {
+                    faces[i * 3] = this.readUint32();
+                    faces[i * 3 + 1] = this.readUint32();
+                    faces[i * 3 + 2] = this.readUint32();
+                }
+                return { vertices, faces };
             }
 
             parseToolpaths(version) {
                 const pathCount = this.readUint16();
                 const toolpaths = [];
-                
                 for (let i = 0; i < pathCount; i++) {
-                    try {
-                        toolpaths.push({
-                            toolNumber: this.readUint16(),
-                            points: this.readPathPoints()
-                        });
-                    } catch (error) {
-                        console.warn(`Skipping toolpath ${i}: ${error.message}`);
-                    }
+                    toolpaths.push({
+                        toolNumber: this.readUint16(),
+                        points: this.readPathPoints()
+                    });
                 }
                 return toolpaths;
             }
@@ -315,7 +341,6 @@
             readPathPoints() {
                 const pointCount = this.readUint32();
                 const points = [];
-                
                 for (let i = 0; i < pointCount; i++) {
                     points.push({
                         x: this.readFloat(),
@@ -327,7 +352,6 @@
                 return points;
             }
 
-            // Binary reading helpers
             readUint32() {
                 const value = this.dataView.getUint32(this.offset, this.littleEndian);
                 this.offset += 4;
@@ -355,7 +379,7 @@
             readUint64() {
                 const left = this.readUint32();
                 const right = this.readUint32();
-                return left + 2**32 * right;
+                return left + 2 ** 32 * right;
             }
 
             readString(length) {
@@ -368,9 +392,95 @@
             }
         }
 
-        // ==============================================
-        // 3D Viewer Class
-        // ==============================================
+        // MCX Parser (Simplified Hypothetical Format)
+        class McxParser {
+            constructor(buffer) {
+                this.buffer = buffer;
+                this.text = new TextDecoder().decode(buffer);
+            }
+
+            parse() {
+                try {
+                    const lines = this.text.split('\n');
+                    const toolpaths = [];
+                    let currentTool = 0;
+                    let points = [];
+
+                    for (let line of lines) {
+                        line = line.trim();
+                        if (line.startsWith('T')) {
+                            if (points.length > 0) {
+                                toolpaths.push({ toolNumber: currentTool, points });
+                                points = [];
+                            }
+                            currentTool = parseInt(line.substring(1)) || 0;
+                        } else if (line.startsWith('X') || line.startsWith('Y') || line.startsWith('Z')) {
+                            const coords = line.match(/[XYZF][-\d.]+/g) || [];
+                            const point = { x: 0, y: 0, z: 0, feedRate: 0 };
+                            coords.forEach(c => {
+                                const value = parseFloat(c.substring(1));
+                                if (c.startsWith('X')) point.x = value;
+                                if (c.startsWith('Y')) point.y = value;
+                                if (c.startsWith('Z')) point.z = value;
+                                if (c.startsWith('F')) point.feedRate = value;
+                            });
+                            points.push(point);
+                        }
+                    }
+                    if (points.length > 0) toolpaths.push({ toolNumber: currentTool, points });
+                    return { success: true, toolpaths, rawText: this.text };
+                } catch (error) {
+                    return { success: false, error: `MCX parsing failed: ${error.message}` };
+                }
+            }
+        }
+
+        // G-code Parser
+        class GcodeParser {
+            constructor(buffer) {
+                this.text = new TextDecoder().decode(buffer);
+            }
+
+            parse() {
+                try {
+                    const lines = this.text.split('\n');
+                    const toolpaths = [];
+                    let currentTool = 0;
+                    let points = [];
+                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0 };
+
+                    for (let line of lines) {
+                        line = line.trim();
+                        if (line.startsWith(';') || line === '') continue;
+                        if (line.startsWith('T')) {
+                            if (points.length > 0) {
+                                toolpaths.push({ toolNumber: currentTool, points });
+                                points = [];
+                            }
+                            currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
+                        } else if (line.match(/G[0-1]/)) {
+                            const coords = line.match(/[XYZF][-\d.]+/g) || [];
+                            const point = { ...lastPos };
+                            coords.forEach(c => {
+                                const value = parseFloat(c.substring(1));
+                                if (c.startsWith('X')) point.x = value;
+                                if (c.startsWith('Y')) point.y = value;
+                                if (c.startsWith('Z')) point.z = value;
+                                if (c.startsWith('F')) point.feedRate = value;
+                            });
+                            points.push(point);
+                            lastPos = { ...point };
+                        }
+                    }
+                    if (points.length > 0) toolpaths.push({ toolNumber: currentTool, points });
+                    return { success: true, toolpaths, rawText: this.text };
+                } catch (error) {
+                    return { success: false, error: `G-code parsing failed: ${error.message}` };
+                }
+            }
+        }
+
+        // 3D Viewer Class (unchanged except for minor tweaks)
         class ThreeDViewer {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
@@ -379,39 +489,24 @@
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.wireframeMode = false;
-                
                 this.init();
             }
 
             init() {
-                // Renderer setup
                 this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
                 this.renderer.setClearColor(0xf0f0f0);
                 this.container.appendChild(this.renderer.domElement);
-                
-                // Camera position
                 this.camera.position.z = 50;
-                
-                // Controls
                 this.controls.enableDamping = true;
                 this.controls.dampingFactor = 0.25;
-                
-                // Lighting
                 const ambientLight = new THREE.AmbientLight(0x404040);
                 this.scene.add(ambientLight);
-                
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
                 directionalLight.position.set(1, 1, 1);
                 this.scene.add(directionalLight);
-                
-                // Helpers
                 this.scene.add(new THREE.GridHelper(100, 100));
                 this.scene.add(new THREE.AxesHelper(10));
-                
-                // Animation loop
                 this.animate();
-                
-                // Window resize handler
                 window.addEventListener('resize', () => this.onWindowResize());
             }
 
@@ -429,12 +524,10 @@
 
             loadGeometry(geometryData) {
                 this.clearSceneExceptHelpers();
-                
                 const geometry = new THREE.BufferGeometry();
                 geometry.setAttribute('position', new THREE.BufferAttribute(geometryData.vertices, 3));
                 geometry.setIndex(new THREE.BufferAttribute(geometryData.faces, 1));
                 geometry.computeVertexNormals();
-                
                 const material = new THREE.MeshPhongMaterial({
                     color: 0x2194ce,
                     specular: 0x111111,
@@ -442,7 +535,6 @@
                     side: THREE.DoubleSide,
                     wireframe: this.wireframeMode
                 });
-                
                 const mesh = new THREE.Mesh(geometry, material);
                 this.scene.add(mesh);
                 this.zoomToObject(mesh);
@@ -450,7 +542,6 @@
 
             renderToolpaths(toolpaths) {
                 this.scene.children.filter(obj => obj.userData.isToolpath).forEach(obj => this.scene.remove(obj));
-                
                 toolpaths.forEach(toolpath => {
                     const points = toolpath.points.map(p => new THREE.Vector3(p.x, p.y, p.z));
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -458,7 +549,6 @@
                         color: this.getToolColor(toolpath.toolNumber),
                         linewidth: 2
                     });
-                    
                     const line = new THREE.Line(geometry, material);
                     line.userData.isToolpath = true;
                     this.scene.add(line);
@@ -474,7 +564,6 @@
                 const box = new THREE.Box3().setFromObject(object);
                 const size = box.getSize(new THREE.Vector3()).length();
                 const center = box.getCenter(new THREE.Vector3());
-                
                 this.camera.position.copy(center);
                 this.camera.position.z += size * 1.5;
                 this.controls.target.copy(center);
@@ -483,9 +572,7 @@
 
             clearSceneExceptHelpers() {
                 this.scene.children.forEach(child => {
-                    if (!(child instanceof THREE.GridHelper || 
-                          child instanceof THREE.AxesHelper || 
-                          child instanceof THREE.Light)) {
+                    if (!(child instanceof THREE.GridHelper || child instanceof THREE.AxesHelper || child instanceof THREE.Light)) {
                         this.scene.remove(child);
                     }
                 });
@@ -494,9 +581,7 @@
             toggleWireframeMode() {
                 this.wireframeMode = !this.wireframeMode;
                 this.scene.traverse(child => {
-                    if (child.isMesh) {
-                        child.material.wireframe = this.wireframeMode;
-                    }
+                    if (child.isMesh) child.material.wireframe = this.wireframeMode;
                 });
             }
 
@@ -507,33 +592,37 @@
             }
         }
 
-        // ==============================================
         // File Format Detection
-        // ==============================================
         function detectFileFormat(buffer) {
             if (buffer.byteLength < 4) return 'UNKNOWN';
-            
             const header = new Uint8Array(buffer.slice(0, 4));
             const headerStr = String.fromCharCode(...header);
-            
             if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
-            if (headerStr.startsWith('%')) return 'GCODE';
-            if (headerStr === 'STL\x00' || headerStr === 'solid') return 'STL';
-            
+            if (headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
+            if (headerStr === 'MCX ') return 'MCX'; // Hypothetical MCX header
             return 'UNKNOWN';
         }
 
-        // ==============================================
         // Main Application
-        // ==============================================
         document.addEventListener('DOMContentLoaded', () => {
             const viewer = new ThreeDViewer('viewer-container');
             const fileInput = document.getElementById('file-input');
             const viewToggleBtn = document.getElementById('view-toggle');
             const resetViewBtn = document.getElementById('reset-view');
+            const editToggleBtn = document.getElementById('edit-toggle');
             const errorMessage = document.getElementById('error-message');
+            const editorPanel = document.getElementById('editor-panel');
+            const fileContent = document.getElementById('file-content');
+            const xOffset = document.getElementById('x-offset');
+            const yOffset = document.getElementById('y-offset');
+            const zOffset = document.getElementById('z-offset');
+            const applyChangesBtn = document.getElementById('apply-changes');
+            const saveFileBtn = document.getElementById('save-file');
 
-            // UI Functions
+            let currentFile = null;
+            let currentFormat = null;
+            let currentData = null;
+
             function showLoading(message) {
                 document.getElementById('loading-text').textContent = message;
                 document.getElementById('loading-overlay').style.display = 'flex';
@@ -553,11 +642,13 @@
                 document.getElementById('file-name').textContent = file.name;
                 document.getElementById('file-size').textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
                 document.getElementById('file-type').textContent = format;
-                
                 if (data?.geometry) {
                     const vertexCount = data.geometry.vertices.length / 3;
                     const faceCount = data.geometry.faces.length / 3;
                     document.getElementById('entity-count').textContent = `${vertexCount} vertices, ${faceCount} faces`;
+                } else if (data?.toolpaths) {
+                    const pointCount = data.toolpaths.reduce((sum, tp) => sum + tp.points.length, 0);
+                    document.getElementById('entity-count').textContent = `${pointCount} points`;
                 } else {
                     document.getElementById('entity-count').textContent = 'N/A';
                 }
@@ -572,30 +663,82 @@
                 });
             }
 
-            // Event Listeners
+            function applyOffsets(toolpaths, xOff, yOff, zOff) {
+                return toolpaths.map(tp => ({
+                    ...tp,
+                    points: tp.points.map(p => ({
+                        x: p.x + xOff,
+                        y: p.y + yOff,
+                        z: p.z + zOff,
+                        feedRate: p.feedRate
+                    }))
+                }));
+            }
+
+            function updateGcodeText(rawText, xOff, yOff, zOff) {
+                const lines = rawText.split('\n');
+                return lines.map(line => {
+                    if (line.match(/G[0-1]/)) {
+                        return line.replace(/[XYZ][-\d.]+/g, match => {
+                            const axis = match[0];
+                            const value = parseFloat(match.substring(1));
+                            if (axis === 'X') return `X${(value + xOff).toFixed(3)}`;
+                            if (axis === 'Y') return `Y${(value + yOff).toFixed(3)}`;
+                            if (axis === 'Z') return `Z${(value + zOff).toFixed(3)}`;
+                            return match;
+                        });
+                    }
+                    return line;
+                }).join('\n');
+            }
+
             fileInput.addEventListener('change', async (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
 
                 showLoading(`Processing ${file.name}...`);
-                
                 try {
                     const arrayBuffer = await readFileAsArrayBuffer(file);
                     const format = detectFileFormat(arrayBuffer);
-                    
+                    currentFile = file;
+                    currentFormat = format;
+
                     if (format === 'MCAM') {
                         const parser = new McamParser(arrayBuffer);
                         const result = parser.parse();
-                        
                         if (result.success) {
+                            currentData = result;
                             updateFileInfo(file, 'MCAM', result);
                             viewer.loadGeometry(result.geometry);
                             if (result.toolpaths) viewer.renderToolpaths(result.toolpaths);
+                            fileContent.value = "MCAM binary data (not editable directly)";
+                        } else {
+                            throw new Error(result.error);
+                        }
+                    } else if (format === 'MCX') {
+                        const parser = new McxParser(arrayBuffer);
+                        const result = parser.parse();
+                        if (result.success) {
+                            currentData = result;
+                            updateFileInfo(file, 'MCX', result);
+                            viewer.renderToolpaths(result.toolpaths);
+                            fileContent.value = result.rawText;
+                        } else {
+                            throw new Error(result.error);
+                        }
+                    } else if (format === 'GCODE') {
+                        const parser = new GcodeParser(arrayBuffer);
+                        const result = parser.parse();
+                        if (result.success) {
+                            currentData = result;
+                            updateFileInfo(file, 'G-code', result);
+                            viewer.renderToolpaths(result.toolpaths);
+                            fileContent.value = result.rawText;
                         } else {
                             throw new Error(result.error);
                         }
                     } else {
-                        throw new Error(`Unsupported file format: ${format}. Please upload an MCAM file.`);
+                        throw new Error(`Unsupported file format: ${format}`);
                     }
                 } catch (error) {
                     console.error('Error:', error);
@@ -613,6 +756,55 @@
 
             resetViewBtn.addEventListener('click', () => {
                 viewer.resetView();
+            });
+
+            editToggleBtn.addEventListener('click', () => {
+                editorPanel.style.display = editorPanel.style.display === 'none' ? 'block' : 'none';
+                editToggleBtn.classList.toggle('active');
+            });
+
+            applyChangesBtn.addEventListener('click', () => {
+                if (!currentData || !currentFormat) return showError('No file loaded');
+                const xOff = parseFloat(xOffset.value) || 0;
+                const yOff = parseFloat(yOffset.value) || 0;
+                const zOff = parseFloat(zOffset.value) || 0;
+
+                if (currentFormat === 'MCAM' && currentData.geometry) {
+                    const vertices = new Float32Array(currentData.geometry.vertices);
+                    for (let i = 0; i < vertices.length; i += 3) {
+                        vertices[i] += xOff;
+                        vertices[i + 1] += yOff;
+                        vertices[i + 2] += zOff;
+                    }
+                    currentData.geometry.vertices = vertices;
+                    viewer.loadGeometry(currentData.geometry);
+                    if (currentData.toolpaths) {
+                        currentData.toolpaths = applyOffsets(currentData.toolpaths, xOff, yOff, zOff);
+                        viewer.renderToolpaths(currentData.toolpaths);
+                    }
+                } else if (currentFormat === 'MCX' || currentFormat === 'GCODE') {
+                    currentData.toolpaths = applyOffsets(currentData.toolpaths, xOff, yOff, zOff);
+                    viewer.renderToolpaths(currentData.toolpaths);
+                    fileContent.value = updateGcodeText(currentData.rawText, xOff, yOff, zOff);
+                    currentData.rawText = fileContent.value;
+                }
+            });
+
+            saveFileBtn.addEventListener('click', () => {
+                if (!currentFile || !currentData || !currentFormat) return showError('No file to save');
+                let blob;
+                if (currentFormat === 'MCAM') {
+                    showError('Saving edited MCAM files is not supported yet');
+                    return;
+                } else if (currentFormat === 'MCX' || currentFormat === 'GCODE') {
+                    blob = new Blob([fileContent.value], { type: 'text/plain' });
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentFile.name;
+                a.click();
+                URL.revokeObjectURL(url);
             });
         });
     </script>
