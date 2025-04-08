@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced MCAM Viewer with Editing</title>
+    <title>Ultimate MCAM Viewer</title>
     <style>
         body {
             margin: 0;
@@ -21,7 +21,7 @@
             background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
         }
 
-        #file-input {
+        #file-input, #load-sample {
             position: absolute;
             top: 20px;
             left: 20px;
@@ -38,7 +38,11 @@
             transition: all 0.3s ease;
         }
 
-        #file-input:hover {
+        #load-sample {
+            left: 150px;
+        }
+
+        #file-input:hover, #load-sample:hover {
             background: rgba(255, 255, 255, 1);
             border-color: #357ab8;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -50,6 +54,7 @@
             right: 20px;
             z-index: 100;
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
@@ -66,6 +71,7 @@
             cursor: pointer;
             font-size: 13px;
             transition: all 0.2s ease;
+            position: relative;
         }
 
         .tool-button:hover {
@@ -76,19 +82,48 @@
             background: #357ab8;
         }
 
-        .info-panel {
+        .tool-button::after {
+            content: attr(data-tooltip);
             position: absolute;
-            bottom: 20px;
-            left: 20px;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            display: none;
+            white-space: nowrap;
+        }
+
+        .tool-button:hover::after {
+            display: block;
+        }
+
+        .info-panel, .editor-panel {
+            position: absolute;
             z-index: 100;
             background: rgba(255, 255, 255, 0.9);
             padding: 15px;
             border-radius: 6px;
-            max-width: 300px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
         }
 
-        .info-panel h3 {
+        .info-panel {
+            bottom: 20px;
+            left: 20px;
+        }
+
+        .editor-panel {
+            bottom: 20px;
+            right: 20px;
+            max-width: 400px;
+            display: none;
+        }
+
+        .info-panel h3, .editor-panel h3 {
             margin-top: 0;
             color: #4a90e2;
             font-size: 16px;
@@ -106,6 +141,39 @@
             color: #555;
             display: inline-block;
             width: 120px;
+        }
+
+        .editor-panel textarea {
+            width: 100%;
+            height: 150px;
+            resize: vertical;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .editor-panel input[type="number"], .editor-panel input[type="color"] {
+            width: 80px;
+            padding: 5px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .editor-panel button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .editor-panel button:hover {
+            background: #357ab8;
         }
 
         .loading-overlay {
@@ -133,6 +201,21 @@
             margin-bottom: 15px;
         }
 
+        .progress-bar {
+            width: 200px;
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #4a90e2;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -152,97 +235,39 @@
             text-align: center;
             display: none;
         }
-
-        .editor-panel {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            z-index: 100;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 6px;
-            max-width: 400px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            display: none;
-        }
-
-        .editor-panel h3 {
-            margin-top: 0;
-            color: #4a90e2;
-            font-size: 16px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 8px;
-        }
-
-        .editor-panel textarea {
-            width: 100%;
-            height: 150px;
-            resize: vertical;
-            font-family: monospace;
-            font-size: 12px;
-            padding: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .editor-panel input[type="number"] {
-            width: 80px;
-            padding: 5px;
-            margin: 5px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .editor-panel button {
-            background: #4a90e2;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .editor-panel button:hover {
-            background: #357ab8;
-        }
     </style>
 </head>
 <body>
     <div id="viewer-container">
         <input type="file" id="file-input" accept=".mcam,.mcx,.gcode" />
+        <button id="load-sample">Load Sample MCAM</button>
 
         <div id="loading-overlay" class="loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <div id="loading-text">Processing File...</div>
+            <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         </div>
 
         <div id="error-message" class="error-message"></div>
 
         <div class="toolbar">
-            <button class="tool-button" id="view-toggle">Toggle Wireframe</button>
-            <button class="tool-button" id="reset-view">Reset View</button>
-            <button class="tool-button" id="edit-toggle">Edit File</button>
+            <button class="tool-button" id="view-toggle" data-tooltip="Toggle wireframe view">Toggle Wireframe</button>
+            <button class="tool-button" id="reset-view" data-tooltip="Reset camera position">Reset View</button>
+            <button class="tool-button" id="edit-toggle" data-tooltip="Open/close editor">Edit File</button>
+            <button class="tool-button" id="measure-tool" data-tooltip="Measure distances">Measure</button>
+            <button class="tool-button" id="animate-tool" data-tooltip="Animate toolpaths">Animate</button>
+            <button class="tool-button" id="export-stl" data-tooltip="Export as STL">Export STL</button>
+            <button class="tool-button" id="export-png" data-tooltip="Take screenshot">Export PNG</button>
+            <button class="tool-button" id="undo" data-tooltip="Undo last change">Undo</button>
+            <button class="tool-button" id="redo" data-tooltip="Redo last change">Redo</button>
         </div>
 
         <div class="info-panel">
             <h3>File Information</h3>
-            <div class="info-item">
-                <span class="info-label">File Name:</span>
-                <span id="file-name">None</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">File Size:</span>
-                <span id="file-size">0 MB</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">File Type:</span>
-                <span id="file-type">Unknown</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Entities:</span>
-                <span id="entity-count">0</span>
-            </div>
+            <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
+            <div class="info-item"><span class="info-label">File Size:</span><span id="file-size">0 MB</span></div>
+            <div class="info-item"><span class="info-label">File Type:</span><span id="file-type">Unknown</span></div>
+            <div class="info-item"><span class="info-label">Entities:</span><span id="entity-count">0</span></div>
         </div>
 
         <div class="editor-panel" id="editor-panel">
@@ -254,6 +279,11 @@
                 <label>Y Offset: <input type="number" id="y-offset" value="0" step="0.1"></label><br>
                 <label>Z Offset: <input type="number" id="z-offset" value="0" step="0.1"></label>
             </div>
+            <h3>Colors</h3>
+            <div>
+                <label>Geometry: <input type="color" id="geometry-color" value="#2194ce"></label><br>
+                <label>Toolpath Base: <input type="color" id="toolpath-color" value="#ff0000"></label>
+            </div>
             <button id="apply-changes">Apply Changes</button>
             <button id="save-file">Save File</button>
         </div>
@@ -261,9 +291,42 @@
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/exporters/STLExporter.js"></script>
 
     <script>
-        // MCAM Parser (unchanged from original)
+        // Sample MCAM File (Simulated as ArrayBuffer)
+        function createSampleMcam() {
+            const buffer = new ArrayBuffer(128);
+            const view = new DataView(buffer);
+            // Header: "MCAM", version 1, size 128, creation date, units (mm)
+            view.setUint8(0, 'M'.charCodeAt(0));
+            view.setUint8(1, 'C'.charCodeAt(0));
+            view.setUint8(2, 'A'.charCodeAt(0));
+            view.setUint8(3, 'M'.charCodeAt(0));
+            view.setUint32(4, 1, true); // Version
+            view.setUint32(8, 128, true); // File size
+            view.setUint32(12, 0, true); // Creation date low
+            view.setUint32(16, 0, true); // Creation date high
+            view.setUint8(20, 0); // Units (mm)
+            // Geometry: 4 vertices, 2 faces
+            view.setUint32(21, 4, true); // Vertex count
+            view.setFloat32(25, 0, true); view.setFloat32(29, 0, true); view.setFloat32(33, 0, true); // V1
+            view.setFloat32(37, 10, true); view.setFloat32(41, 0, true); view.setFloat32(45, 0, true); // V2
+            view.setFloat32(49, 0, true); view.setFloat32(53, 10, true); view.setFloat32(57, 0, true); // V3
+            view.setFloat32(61, 10, true); view.setFloat32(65, 10, true); view.setFloat32(69, 0, true); // V4
+            view.setUint32(73, 2, true); // Face count
+            view.setUint32(77, 0, true); view.setUint32(81, 1, true); view.setUint32(85, 2, true); // F1
+            view.setUint32(89, 1, true); view.setUint32(93, 2, true); view.setUint32(97, 3, true); // F2
+            // Toolpath: 1 path, 3 points
+            view.setUint16(101, 1, true); // Path count
+            view.setUint16(103, 1, true); // Tool number
+            view.setUint32(105, 3, true); // Point count
+            view.setFloat32(109, 0, true); view.setFloat32(113, 0, true); view.setFloat32(117, 5, true); view.setFloat32(121, 100, true); // P1
+            view.setFloat32(125, 5, true); view.setFloat32(129, 5, true); view.setFloat32(133, 5, true); view.setFloat32(137, 100, true); // P2
+            return buffer;
+        }
+
+        // MCAM Parser
         class McamParser {
             constructor(buffer) {
                 this.buffer = buffer;
@@ -277,9 +340,7 @@
                 try {
                     this.checkFileSize();
                     const header = this.parseHeader();
-                    if (!this.supportedVersions.includes(header.version)) {
-                        throw new Error(`Unsupported MCAM version ${header.version}`);
-                    }
+                    if (!this.supportedVersions.includes(header.version)) throw new Error(`Unsupported MCAM version ${header.version}`);
                     const geometry = this.parseGeometry(header.version);
                     const toolpaths = this.parseToolpaths(header.version);
                     return { success: true, header, geometry, toolpaths };
@@ -288,22 +349,14 @@
                 }
             }
 
-            checkFileSize() {
-                if (this.buffer.byteLength < 16) throw new Error('File too small');
-            }
-
+            checkFileSize() { if (this.buffer.byteLength < 16) throw new Error('File too small'); }
             parseHeader() {
                 const magic = this.readString(4);
                 if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
                 const version = this.readUint32();
                 const fileSize = this.readUint32();
-                if (fileSize !== this.buffer.byteLength) throw new Error('File size mismatch');
-                return {
-                    version,
-                    fileSize,
-                    creationDate: this.readUint64(),
-                    units: this.readByte() === 0 ? 'mm' : 'inch'
-                };
+                if (fileSize > this.buffer.byteLength) throw new Error('File size mismatch');
+                return { version, fileSize, creationDate: this.readUint64(), units: this.readByte() === 0 ? 'mm' : 'inch' };
             }
 
             parseGeometry(version) {
@@ -323,17 +376,14 @@
                     faces[i * 3 + 1] = this.readUint32();
                     faces[i * 3 + 2] = this.readUint32();
                 }
-                return { vertices, faces };
+                return { vertices, Hawkinsfaces };
             }
 
             parseToolpaths(version) {
                 const pathCount = this.readUint16();
                 const toolpaths = [];
                 for (let i = 0; i < pathCount; i++) {
-                    toolpaths.push({
-                        toolNumber: this.readUint16(),
-                        points: this.readPathPoints()
-                    });
+                    toolpaths.push({ toolNumber: this.readUint16(), points: this.readPathPoints() });
                 }
                 return toolpaths;
             }
@@ -342,46 +392,16 @@
                 const pointCount = this.readUint32();
                 const points = [];
                 for (let i = 0; i < pointCount; i++) {
-                    points.push({
-                        x: this.readFloat(),
-                        y: this.readFloat(),
-                        z: this.readFloat(),
-                        feedRate: this.readFloat()
-                    });
+                    points.push({ x: this.readFloat(), y: this.readFloat(), z: this.readFloat(), feedRate: this.readFloat() });
                 }
                 return points;
             }
 
-            readUint32() {
-                const value = this.dataView.getUint32(this.offset, this.littleEndian);
-                this.offset += 4;
-                return value;
-            }
-
-            readUint16() {
-                const value = this.dataView.getUint16(this.offset, this.littleEndian);
-                this.offset += 2;
-                return value;
-            }
-
-            readFloat() {
-                const value = this.dataView.getFloat32(this.offset, this.littleEndian);
-                this.offset += 4;
-                return value;
-            }
-
-            readByte() {
-                const value = this.dataView.getUint8(this.offset);
-                this.offset += 1;
-                return value;
-            }
-
-            readUint64() {
-                const left = this.readUint32();
-                const right = this.readUint32();
-                return left + 2 ** 32 * right;
-            }
-
+            readUint32() { const v = this.dataView.getUint32(this.offset, this.littleEndian); this.offset += 4; return v; }
+            readUint16() { const v = this.dataView.getUint16(this.offset, this.littleEndian); this.offset += 2; return v; }
+            readFloat() { const v = this.dataView.getFloat32(this.offset, this.littleEndian); this.offset += 4; return v; }
+            readByte() { const v = this.dataView.getUint8(this.offset); this.offset += 1; return v; }
+            readUint64() { const l = this.readUint32(); const r = this.readUint32(); return l + 2 ** 32 * r; }
             readString(length) {
                 let result = '';
                 for (let i = 0; i < length; i++) {
@@ -392,42 +412,35 @@
             }
         }
 
-        // MCX Parser (Simplified Hypothetical Format)
+        // MCX Parser (Hypothetical)
         class McxParser {
-            constructor(buffer) {
-                this.buffer = buffer;
-                this.text = new TextDecoder().decode(buffer);
-            }
-
+            constructor(buffer) { this.text = new TextDecoder().decode(buffer); }
             parse() {
                 try {
                     const lines = this.text.split('\n');
                     const toolpaths = [];
                     let currentTool = 0;
                     let points = [];
-
                     for (let line of lines) {
                         line = line.trim();
                         if (line.startsWith('T')) {
-                            if (points.length > 0) {
-                                toolpaths.push({ toolNumber: currentTool, points });
-                                points = [];
-                            }
+                            if (points.length) toolpaths.push({ toolNumber: currentTool, points });
+                            points = [];
                             currentTool = parseInt(line.substring(1)) || 0;
-                        } else if (line.startsWith('X') || line.startsWith('Y') || line.startsWith('Z')) {
+                        } else if (line.match(/[XYZF]/)) {
                             const coords = line.match(/[XYZF][-\d.]+/g) || [];
                             const point = { x: 0, y: 0, z: 0, feedRate: 0 };
                             coords.forEach(c => {
                                 const value = parseFloat(c.substring(1));
-                                if (c.startsWith('X')) point.x = value;
-                                if (c.startsWith('Y')) point.y = value;
-                                if (c.startsWith('Z')) point.z = value;
-                                if (c.startsWith('F')) point.feedRate = value;
+                                if (c[0] === 'X') point.x = value;
+                                if (c[0] === 'Y') point.y = value;
+                                if (c[0] === 'Z') point.z = value;
+                                if (c[0] === 'F') point.feedRate = value;
                             });
                             points.push(point);
                         }
                     }
-                    if (points.length > 0) toolpaths.push({ toolNumber: currentTool, points });
+                    if (points.length) toolpaths.push({ toolNumber: currentTool, points });
                     return { success: true, toolpaths, rawText: this.text };
                 } catch (error) {
                     return { success: false, error: `MCX parsing failed: ${error.message}` };
@@ -437,10 +450,7 @@
 
         // G-code Parser
         class GcodeParser {
-            constructor(buffer) {
-                this.text = new TextDecoder().decode(buffer);
-            }
-
+            constructor(buffer) { this.text = new TextDecoder().decode(buffer); }
             parse() {
                 try {
                     const lines = this.text.split('\n');
@@ -448,31 +458,28 @@
                     let currentTool = 0;
                     let points = [];
                     let lastPos = { x: 0, y: 0, z: 0, feedRate: 0 };
-
                     for (let line of lines) {
                         line = line.trim();
-                        if (line.startsWith(';') || line === '') continue;
+                        if (line.startsWith(';') || !line) continue;
                         if (line.startsWith('T')) {
-                            if (points.length > 0) {
-                                toolpaths.push({ toolNumber: currentTool, points });
-                                points = [];
-                            }
+                            if (points.length) toolpaths.push({ toolNumber: currentTool, points });
+                            points = [];
                             currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
                         } else if (line.match(/G[0-1]/)) {
                             const coords = line.match(/[XYZF][-\d.]+/g) || [];
                             const point = { ...lastPos };
                             coords.forEach(c => {
                                 const value = parseFloat(c.substring(1));
-                                if (c.startsWith('X')) point.x = value;
-                                if (c.startsWith('Y')) point.y = value;
-                                if (c.startsWith('Z')) point.z = value;
-                                if (c.startsWith('F')) point.feedRate = value;
+                                if (c[0] === 'X') point.x = value;
+                                if (c[0] === 'Y') point.y = value;
+                                if (c[0] === 'Z') point.z = value;
+                                if (c[0] === 'F') point.feedRate = value;
                             });
                             points.push(point);
                             lastPos = { ...point };
                         }
                     }
-                    if (points.length > 0) toolpaths.push({ toolNumber: currentTool, points });
+                    if (points.length) toolpaths.push({ toolNumber: currentTool, points });
                     return { success: true, toolpaths, rawText: this.text };
                 } catch (error) {
                     return { success: false, error: `G-code parsing failed: ${error.message}` };
@@ -480,7 +487,7 @@
             }
         }
 
-        // 3D Viewer Class (unchanged except for minor tweaks)
+        // 3D Viewer
         class ThreeDViewer {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
@@ -488,7 +495,14 @@
                 this.camera = new THREE.PerspectiveCamera(75, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
                 this.wireframeMode = false;
+                this.measureMode = false;
+                this.measurePoints = [];
+                this.geometryColor = 0x2194ce;
+                this.toolpathBaseColor = 0xff0000;
+                this.animating = false;
                 this.init();
             }
 
@@ -499,8 +513,7 @@
                 this.camera.position.z = 50;
                 this.controls.enableDamping = true;
                 this.controls.dampingFactor = 0.25;
-                const ambientLight = new THREE.AmbientLight(0x404040);
-                this.scene.add(ambientLight);
+                this.scene.add(new THREE.AmbientLight(0x404040));
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
                 directionalLight.position.set(1, 1, 1);
                 this.scene.add(directionalLight);
@@ -508,10 +521,12 @@
                 this.scene.add(new THREE.AxesHelper(10));
                 this.animate();
                 window.addEventListener('resize', () => this.onWindowResize());
+                this.container.addEventListener('click', (e) => this.onClick(e));
             }
 
             animate() {
                 requestAnimationFrame(() => this.animate());
+                if (this.animating) this.updateAnimation();
                 this.controls.update();
                 this.renderer.render(this.scene, this.camera);
             }
@@ -529,7 +544,7 @@
                 geometry.setIndex(new THREE.BufferAttribute(geometryData.faces, 1));
                 geometry.computeVertexNormals();
                 const material = new THREE.MeshPhongMaterial({
-                    color: 0x2194ce,
+                    color: this.geometryColor,
                     specular: 0x111111,
                     shininess: 30,
                     side: THREE.DoubleSide,
@@ -542,22 +557,23 @@
 
             renderToolpaths(toolpaths) {
                 this.scene.children.filter(obj => obj.userData.isToolpath).forEach(obj => this.scene.remove(obj));
-                toolpaths.forEach(toolpath => {
+                toolpaths.forEach((toolpath, index) => {
                     const points = toolpath.points.map(p => new THREE.Vector3(p.x, p.y, p.z));
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
                     const material = new THREE.LineBasicMaterial({
-                        color: this.getToolColor(toolpath.toolNumber),
+                        color: this.getToolColor(index),
                         linewidth: 2
                     });
                     const line = new THREE.Line(geometry, material);
-                    line.userData.isToolpath = true;
+                    line.userData = { isToolpath: true, toolNumber: toolpath.toolNumber, points: toolpath.points };
                     this.scene.add(line);
                 });
             }
 
-            getToolColor(toolNumber) {
-                const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff];
-                return colors[toolNumber % colors.length];
+            getToolColor(index) {
+                const base = parseInt(this.toolpathBaseColor.toString(16), 16);
+                const variation = (index * 0x333333) % 0xffffff;
+                return base + variation;
             }
 
             zoomToObject(object) {
@@ -590,6 +606,76 @@
                 this.camera.position.set(0, 0, 50);
                 this.controls.update();
             }
+
+            onClick(event) {
+                if (!this.measureMode) return;
+                this.mouse.x = (event.clientX / this.container.clientWidth) * 2 - 1;
+                this.mouse.y = -(event.clientY / this.container.clientHeight) * 2 + 1;
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.scene.children);
+                if (intersects.length) {
+                    const point = intersects[0].point;
+                    this.measurePoints.push(point);
+                    if (this.measurePoints.length === 2) {
+                        const distance = this.measurePoints[0].distanceTo(this.measurePoints[1]);
+                        alert(`Distance: ${distance.toFixed(2)} units`);
+                        this.measurePoints = [];
+                    }
+                }
+            }
+
+            startAnimation(toolpaths) {
+                this.animating = true;
+                this.animationData = { toolpaths, currentPath: 0, currentPoint: 0, speed: 0.1 };
+            }
+
+            stopAnimation() {
+                this.animating = false;
+            }
+
+            updateAnimation() {
+                const { toolpaths, currentPath, currentPoint } = this.animationData;
+                if (currentPath >= toolpaths.length) {
+                    this.stopAnimation();
+                    return;
+                }
+                const path = toolpaths[currentPath];
+                if (currentPoint >= path.points.length) {
+                    this.animationData.currentPath++;
+                    this.animationData.currentPoint = 0;
+                    return;
+                }
+                const point = path.points[Math.floor(currentPoint)];
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.5, 16, 16),
+                    new THREE.MeshBasicMaterial({ color: this.getToolColor(currentPath) })
+                );
+                sphere.position.set(point.x, point.y, point.z);
+                sphere.userData.isToolpath = true;
+                this.scene.add(sphere);
+                this.animationData.currentPoint += this.animationData.speed;
+            }
+
+            exportSTL() {
+                const exporter = new THREE.STLExporter();
+                const stl = exporter.parse(this.scene);
+                const blob = new Blob([stl], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'export.stl';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            exportPNG() {
+                this.renderer.render(this.scene, this.camera);
+                const dataURL = this.renderer.domElement.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = 'screenshot.png';
+                a.click();
+            }
         }
 
         // File Format Detection
@@ -599,7 +685,7 @@
             const headerStr = String.fromCharCode(...header);
             if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
             if (headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
-            if (headerStr === 'MCX ') return 'MCX'; // Hypothetical MCX header
+            if (headerStr === 'MCX ') return 'MCX';
             return 'UNKNOWN';
         }
 
@@ -607,24 +693,37 @@
         document.addEventListener('DOMContentLoaded', () => {
             const viewer = new ThreeDViewer('viewer-container');
             const fileInput = document.getElementById('file-input');
+            const loadSampleBtn = document.getElementById('load-sample');
             const viewToggleBtn = document.getElementById('view-toggle');
             const resetViewBtn = document.getElementById('reset-view');
             const editToggleBtn = document.getElementById('edit-toggle');
+            const measureToolBtn = document.getElementById('measure-tool');
+            const animateToolBtn = document.getElementById('animate-tool');
+            const exportSTLBtn = document.getElementById('export-stl');
+            const exportPNGBtn = document.getElementById('export-png');
+            const undoBtn = document.getElementById('undo');
+            const redoBtn = document.getElementById('redo');
             const errorMessage = document.getElementById('error-message');
             const editorPanel = document.getElementById('editor-panel');
             const fileContent = document.getElementById('file-content');
             const xOffset = document.getElementById('x-offset');
             const yOffset = document.getElementById('y-offset');
             const zOffset = document.getElementById('z-offset');
+            const geometryColor = document.getElementById('geometry-color');
+            const toolpathColor = document.getElementById('toolpath-color');
             const applyChangesBtn = document.getElementById('apply-changes');
             const saveFileBtn = document.getElementById('save-file');
+            const progressFill = document.getElementById('progress-fill');
 
             let currentFile = null;
             let currentFormat = null;
             let currentData = null;
+            let history = [];
+            let historyIndex = -1;
 
-            function showLoading(message) {
+            function showLoading(message, progress = 0) {
                 document.getElementById('loading-text').textContent = message;
+                progressFill.style.width = `${progress}%`;
                 document.getElementById('loading-overlay').style.display = 'flex';
             }
 
@@ -633,6 +732,7 @@
             }
 
             function showError(message) {
+                console.error(message);
                 errorMessage.textContent = message;
                 errorMessage.style.display = 'block';
                 setTimeout(() => errorMessage.style.display = 'none', 5000);
@@ -659,26 +759,45 @@
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result);
                     reader.onerror = () => reject(new Error('Failed to read file'));
+                    reader.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const percent = (e.loaded / e.total) * 100;
+                            showLoading(`Loading ${file.name}...`, percent);
+                        }
+                    };
                     reader.readAsArrayBuffer(file);
                 });
             }
 
-            function applyOffsets(toolpaths, xOff, yOff, zOff) {
-                return toolpaths.map(tp => ({
-                    ...tp,
-                    points: tp.points.map(p => ({
-                        x: p.x + xOff,
-                        y: p.y + yOff,
-                        z: p.z + zOff,
-                        feedRate: p.feedRate
-                    }))
-                }));
+            function applyOffsets(data, xOff, yOff, zOff) {
+                const newData = JSON.parse(JSON.stringify(data));
+                if (newData.geometry) {
+                    const vertices = new Float32Array(newData.geometry.vertices);
+                    for (let i = 0; i < vertices.length; i += 3) {
+                        vertices[i] += xOff;
+                        vertices[i + 1] += yOff;
+                        vertices[i + 2] += zOff;
+                    }
+                    newData.geometry.vertices = vertices;
+                }
+                if (newData.toolpaths) {
+                    newData.toolpaths = newData.toolpaths.map(tp => ({
+                        ...tp,
+                        points: tp.points.map(p => ({
+                            x: p.x + xOff,
+                            y: p.y + yOff,
+                            z: p.z + zOff,
+                            feedRate: p.feedRate
+                        }))
+                    }));
+                }
+                return newData;
             }
 
-            function updateGcodeText(rawText, xOff, yOff, zOff) {
+            function updateText(rawText, xOff, yOff, zOff) {
                 const lines = rawText.split('\n');
                 return lines.map(line => {
-                    if (line.match(/G[0-1]/)) {
+                    if (line.match(/G[0-1]/) || line.match(/[XYZ]/)) {
                         return line.replace(/[XYZ][-\d.]+/g, match => {
                             const axis = match[0];
                             const value = parseFloat(match.substring(1));
@@ -692,58 +811,78 @@
                 }).join('\n');
             }
 
+            function addToHistory(data) {
+                if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
+                history.push(JSON.parse(JSON.stringify(data)));
+                historyIndex++;
+                undoBtn.disabled = historyIndex === 0;
+                redoBtn.disabled = historyIndex === history.length - 1;
+            }
+
+            async function processFile(file, arrayBuffer) {
+                showLoading(`Processing ${file.name}...`, 10);
+                const format = detectFileFormat(arrayBuffer);
+                currentFile = file;
+                currentFormat = format;
+                let result;
+
+                if (format === 'MCAM') {
+                    const worker = new Worker(URL.createObjectURL(new Blob([`
+                        onmessage = function(e) {
+                            ${McamParser.toString()}
+                            const parser = new McamParser(e.data);
+                            postMessage(parser.parse());
+                        };
+                    `], { type: 'text/javascript' })));
+                    result = await new Promise(resolve => {
+                        worker.onmessage = e => resolve(e.data);
+                        worker.postMessage(arrayBuffer);
+                    });
+                    worker.terminate();
+                } else if (format === 'MCX') {
+                    const parser = new McxParser(arrayBuffer);
+                    result = parser.parse();
+                } else if (format === 'GCODE') {
+                    const parser = new GcodeParser(arrayBuffer);
+                    result = parser.parse();
+                } else {
+                    throw new Error(`Unsupported file format: ${format}`);
+                }
+
+                showLoading(`Processing ${file.name}...`, 50);
+                if (result.success) {
+                    currentData = result;
+                    addToHistory(result);
+                    updateFileInfo(file, format, result);
+                    if (result.geometry) viewer.loadGeometry(result.geometry);
+                    if (result.toolpaths) viewer.renderToolpaths(result.toolpaths);
+                    fileContent.value = result.rawText || "Binary data (not editable directly)";
+                } else {
+                    throw new Error(result.error);
+                }
+            }
+
             fileInput.addEventListener('change', async (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
-
-                showLoading(`Processing ${file.name}...`);
                 try {
                     const arrayBuffer = await readFileAsArrayBuffer(file);
-                    const format = detectFileFormat(arrayBuffer);
-                    currentFile = file;
-                    currentFormat = format;
-
-                    if (format === 'MCAM') {
-                        const parser = new McamParser(arrayBuffer);
-                        const result = parser.parse();
-                        if (result.success) {
-                            currentData = result;
-                            updateFileInfo(file, 'MCAM', result);
-                            viewer.loadGeometry(result.geometry);
-                            if (result.toolpaths) viewer.renderToolpaths(result.toolpaths);
-                            fileContent.value = "MCAM binary data (not editable directly)";
-                        } else {
-                            throw new Error(result.error);
-                        }
-                    } else if (format === 'MCX') {
-                        const parser = new McxParser(arrayBuffer);
-                        const result = parser.parse();
-                        if (result.success) {
-                            currentData = result;
-                            updateFileInfo(file, 'MCX', result);
-                            viewer.renderToolpaths(result.toolpaths);
-                            fileContent.value = result.rawText;
-                        } else {
-                            throw new Error(result.error);
-                        }
-                    } else if (format === 'GCODE') {
-                        const parser = new GcodeParser(arrayBuffer);
-                        const result = parser.parse();
-                        if (result.success) {
-                            currentData = result;
-                            updateFileInfo(file, 'G-code', result);
-                            viewer.renderToolpaths(result.toolpaths);
-                            fileContent.value = result.rawText;
-                        } else {
-                            throw new Error(result.error);
-                        }
-                    } else {
-                        throw new Error(`Unsupported file format: ${format}`);
-                    }
+                    await processFile(file, arrayBuffer);
                 } catch (error) {
-                    console.error('Error:', error);
                     showError(error.message);
                     updateFileInfo(file, 'Error', null);
+                } finally {
+                    hideLoading();
+                }
+            });
+
+            loadSampleBtn.addEventListener('click', async () => {
+                const sampleBuffer = createSampleMcam();
+                const file = new File([sampleBuffer], 'sample.mcam', { type: 'application/octet-stream' });
+                try {
+                    await processFile(file, sampleBuffer);
+                } catch (error) {
+                    showError(error.message);
                 } finally {
                     hideLoading();
                 }
@@ -754,13 +893,57 @@
                 viewToggleBtn.classList.toggle('active');
             });
 
-            resetViewBtn.addEventListener('click', () => {
-                viewer.resetView();
-            });
+            resetViewBtn.addEventListener('click', () => viewer.resetView());
 
             editToggleBtn.addEventListener('click', () => {
                 editorPanel.style.display = editorPanel.style.display === 'none' ? 'block' : 'none';
                 editToggleBtn.classList.toggle('active');
+            });
+
+            measureToolBtn.addEventListener('click', () => {
+                viewer.measureMode = !viewer.measureMode;
+                measureToolBtn.classList.toggle('active');
+                if (!viewer.measureMode) viewer.measurePoints = [];
+            });
+
+            animateToolBtn.addEventListener('click', () => {
+                if (!currentData?.toolpaths) return showError('No toolpaths to animate');
+                if (viewer.animating) {
+                    viewer.stopAnimation();
+                    animateToolBtn.classList.remove('active');
+                } else {
+                    viewer.startAnimation(currentData.toolpaths);
+                    animateToolBtn.classList.add('active');
+                }
+            });
+
+            exportSTLBtn.addEventListener('click', () => {
+                if (!currentData?.geometry) return showError('No geometry to export');
+                viewer.exportSTL();
+            });
+
+            exportPNGBtn.addEventListener('click', () => viewer.exportPNG());
+
+            undoBtn.addEventListener('click', () => {
+                if (historyIndex <= 0) return;
+                historyIndex--;
+                currentData = JSON.parse(JSON.stringify(history[historyIndex]));
+                if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
+                if (currentData.toolpaths) viewer.renderToolpaths(currentData.toolpaths);
+                fileContent.value = currentData.rawText || "Binary data (not editable directly)";
+                undoBtn.disabled = historyIndex === 0;
+                redoBtn.disabled = false;
+            });
+
+            redoBtn.addEventListener('click', () => {
+                if (historyIndex >= history.length - 1) return;
+                historyIndex++;
+                currentData = JSON.parse(JSON.stringify(history[historyIndex]));
+                if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
+                if (currentData.toolpaths) viewer.renderToolpaths(currentData.toolpaths);
+                fileContent.value = currentData.rawText || "Binary data (not editable directly)";
+                undoBtn.disabled = false;
+                redoBtn.disabled = historyIndex === history.length - 1;
             });
 
             applyChangesBtn.addEventListener('click', () => {
@@ -768,26 +951,16 @@
                 const xOff = parseFloat(xOffset.value) || 0;
                 const yOff = parseFloat(yOffset.value) || 0;
                 const zOff = parseFloat(zOffset.value) || 0;
-
-                if (currentFormat === 'MCAM' && currentData.geometry) {
-                    const vertices = new Float32Array(currentData.geometry.vertices);
-                    for (let i = 0; i < vertices.length; i += 3) {
-                        vertices[i] += xOff;
-                        vertices[i + 1] += yOff;
-                        vertices[i + 2] += zOff;
-                    }
-                    currentData.geometry.vertices = vertices;
-                    viewer.loadGeometry(currentData.geometry);
-                    if (currentData.toolpaths) {
-                        currentData.toolpaths = applyOffsets(currentData.toolpaths, xOff, yOff, zOff);
-                        viewer.renderToolpaths(currentData.toolpaths);
-                    }
-                } else if (currentFormat === 'MCX' || currentFormat === 'GCODE') {
-                    currentData.toolpaths = applyOffsets(currentData.toolpaths, xOff, yOff, zOff);
-                    viewer.renderToolpaths(currentData.toolpaths);
-                    fileContent.value = updateGcodeText(currentData.rawText, xOff, yOff, zOff);
-                    currentData.rawText = fileContent.value;
+                viewer.geometryColor = parseInt(geometryColor.value.slice(1), 16);
+                viewer.toolpathBaseColor = parseInt(toolpathColor.value.slice(1), 16);
+                currentData = applyOffsets(currentData, xOff, yOff, zOff);
+                if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
+                if (currentData.toolpaths) viewer.renderToolpaths(currentData.toolpaths);
+                if (currentData.rawText) {
+                    currentData.rawText = updateText(currentData.rawText, xOff, yOff, zOff);
+                    fileContent.value = currentData.rawText;
                 }
+                addToHistory(currentData);
             });
 
             saveFileBtn.addEventListener('click', () => {
