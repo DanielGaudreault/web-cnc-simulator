@@ -1,0 +1,52 @@
+const McamParser = require('./core/McamParser');
+const ThreeDViewer = require('./viewer/ThreeDViewer');
+
+class MCAMApplication {
+  constructor() {
+    this.viewer = new ThreeDViewer('viewer-container');
+    this.fileInput = document.getElementById('mcam-file-input');
+    
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    this.fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        this.loadFile(file);
+      }
+    });
+  }
+
+  async loadFile(file) {
+    try {
+      const buffer = await this.readFileAsBuffer(file);
+      const parser = new McamParser(buffer);
+      const result = parser.parse();
+      
+      if (result.success) {
+        this.viewer.loadGeometry(result.geometry);
+        this.viewer.loadToolpaths(result.toolpaths);
+        console.log('Machine Settings:', result.machineSettings);
+      } else {
+        console.error('Error parsing file:', result.error);
+      }
+    } catch (error) {
+      console.error('File loading error:', error);
+    }
+  }
+
+  readFileAsBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+}
+
+// Initialize application when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  new MCAMApplication();
+});
