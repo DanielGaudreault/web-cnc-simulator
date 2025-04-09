@@ -497,7 +497,7 @@
             }
         }
 
-        // 3D Viewer with Dynamic Grid
+        // 3D Viewer with Fixed Grid and Material Fix
         class ThreeDViewer {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
@@ -515,7 +515,6 @@
                 this.toolpathBaseColor = 0xff0000;
                 this.animating = false;
                 this.materialMesh = null;
-                this.gridHelper = null;
                 this.init();
             }
 
@@ -530,8 +529,7 @@
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
                 directionalLight.position.set(1, 1, 1);
                 this.scene.add(directionalLight);
-                this.gridHelper = new THREE.GridHelper(100, 10);
-                this.scene.add(this.gridHelper);
+                this.scene.add(new THREE.GridHelper(100, 100)); // Fixed grid
                 this.scene.add(new THREE.AxesHelper(10));
                 this.animate();
                 window.addEventListener('resize', () => this.onWindowResize());
@@ -551,19 +549,6 @@
                 this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
             }
 
-            updateGrid(bounds) {
-                this.scene.remove(this.gridHelper);
-                const size = Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) * 1.5;
-                const divisions = Math.ceil(size / 10) * 10;
-                this.gridHelper = new THREE.GridHelper(size, divisions);
-                this.gridHelper.position.set(
-                    (bounds.max.x + bounds.min.x) / 2,
-                    (bounds.max.y + bounds.min.y) / 2,
-                    bounds.min.z - 0.1 // Slightly below the object
-                );
-                this.scene.add(this.gridHelper);
-            }
-
             loadGeometry(geometryData) {
                 this.clearSceneExceptHelpers();
                 const geometry = new THREE.BufferGeometry();
@@ -579,24 +564,46 @@
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 this.scene.add(mesh);
-                this.loadMaterial(geometryData);
-                const bounds = this.getBounds(geometryData.vertices);
-                this.updateGrid(bounds);
+                this.loadMaterialFromBounds(geometryData.vertices, geometryData.toolpaths || []);
                 this.zoomToObject(mesh);
             }
 
-            loadMaterial(geometryData) {
-                const positions = geometryData.vertices;
+            loadMaterialFromBounds(vertices, toolpaths) {
                 let minX = Infinity, minY = Infinity, minZ = Infinity;
                 let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-                for (let i = 0; i < positions.length; i += 3) {
-                    minX = Math.min(minX, positions[i]);
-                    minY = Math.min(minY, positions[i + 1]);
-                    minZ = Math.min(minZ, positions[i + 2]);
-                    maxX = Math.max(maxX, positions[i]);
-                    maxY = Math.max(maxY, positions[i + 1]);
-                    maxZ = Math.max(maxZ, positions[i + 2]);
+
+                // Calculate bounds from vertices if present
+                if (vertices && vertices.length) {
+                    for (let i = 0; i < vertices.length; i += 3) {
+                        minX = Math.min(minX, vertices[i]);
+                        minY = Math.min(minY, vertices[i + 1]);
+                        minZ = Math.min(minZ, vertices[i + 2]);
+                        maxX = Math.max(maxX, vertices[i]);
+                        maxY = Math.max(maxY, vertices[i + 1]);
+                        maxZ = Math.max(maxZ, vertices[i + 2]);
+                    }
                 }
+
+                // Include toolpaths in bounds if no geometry or to expand bounds
+                if (toolpaths && toolpaths.length) {
+                    toolpaths.forEach(tp => {
+                        tp.points.forEach(p => {
+                            minX = Math.min(minX, p.x);
+                            minY = Math.min(minY, p.y);
+                            minZ = Math.min(minZ, p.z);
+                            maxX = Math.max(maxX, p.x);
+                            maxY = Math.max(maxY, p.y);
+                            maxZ = Math.max(maxZ, p.z);
+                        });
+                    });
+                }
+
+                // Default bounds if no data
+                if (minX === Infinity) {
+                    minX = minY = minZ = -10;
+                    maxX = maxY = maxZ = 10;
+                }
+
                 const width = maxX - minX + 10;
                 const height = maxY - minY + 10;
                 const depth = maxZ - minZ + 10;
@@ -628,38 +635,7 @@
                     line.userData = { isToolpath: true, toolNumber: toolpath.toolNumber, points: toolpath.points };
                     this.scene.add(line);
                 });
-                const bounds = this.getToolpathBounds(toolpaths);
-                this.updateGrid(bounds);
-            }
-
-            getBounds(vertices) {
-                let minX = Infinity, minY = Infinity, minZ = Infinity;
-                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-                for (let i = 0; i < vertices.length; i += 3) {
-                    minX = Math.min(minX, vertices[i]);
-                    minY = Math.min(minY, vertices[i + 1]);
-                    minZ = Math.min(minZ, vertices[i + 2]);
-                    maxX = Math.max(maxX, vertices[i]);
-                    maxY = Math.max(maxY, vertices[i + 1]);
-                    maxZ = Math.max(maxZ, vertices[i + 2]);
-                }
-                return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
-            }
-
-            getToolpathBounds(toolpaths) {
-                let minX = Infinity, minY = Infinity, minZ = Infinity;
-                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-                toolpaths.forEach(tp => {
-                    tp.points.forEach(p => {
-                        minX = Math.min(minX, p.x);
-                        minY = Math.min(minY, p.y);
-                        minZ = Math.min(minZ, p.z);
-                        maxX = Math.max(maxX, p.x);
-                        maxY = Math.max(maxY, p.y);
-                        maxZ = Math.max(maxZ, p.z);
-                    });
-                });
-                return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
+                if (!this.materialMesh) this.loadMaterialFromBounds([], toolpaths);
             }
 
             getToolColor(index) {
@@ -725,7 +701,7 @@
 
             stopAnimation() {
                 this.animating = false;
-                if (this.materialMesh) this.materialMesh.visible = false;
+                if (this.materialMesh) this.materialMesh.visible = true; // Keep material visible after animation
             }
 
             updateAnimation() {
@@ -965,8 +941,11 @@
                     currentData = result;
                     addToHistory(result);
                     updateFileInfo(file, format, result);
-                    if (result.geometry) viewer.loadGeometry(result.geometry);
-                    if (result.toolpaths && !result.geometry) viewer.renderToolpaths(result.toolpaths);
+                    if (result.geometry) {
+                        viewer.loadGeometry(result);
+                    } else if (result.toolpaths) {
+                        viewer.renderToolpaths(result.toolpaths);
+                    }
                 } else {
                     throw new Error(result.error);
                 }
@@ -1026,7 +1005,7 @@
                 if (historyIndex <= 0) return;
                 historyIndex--;
                 currentData = JSON.parse(JSON.stringify(history[historyIndex]));
-                if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
+                if (currentData.geometry) viewer.loadGeometry(currentData);
                 if (currentData.toolpaths) viewer.renderToolpaths(currentData.toolpaths);
                 fileContent.value = currentData.rawText || "Binary data (not editable directly)";
                 undoBtn.disabled = historyIndex === 0;
@@ -1037,7 +1016,7 @@
                 if (historyIndex >= history.length - 1) return;
                 historyIndex++;
                 currentData = JSON.parse(JSON.stringify(history[historyIndex]));
-                if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
+                if (currentData.geometry) viewer.loadGeometry(currentData);
                 if (currentData.toolpaths) viewer.renderToolpaths(currentData.toolpaths);
                 fileContent.value = currentData.rawText || "Binary data (not editable directly)";
                 undoBtn.disabled = false;
@@ -1053,7 +1032,7 @@
                 viewer.materialColor = parseInt(materialColor.value.slice(1), 16);
                 viewer.toolpathBaseColor = parseInt(toolpathColor.value.slice(1), 16);
                 currentData = applyOffsets(currentData, xOff, yOff, zOff);
-                if (currentData.geometry) viewer.loadGeometry(currentData.geometry);
+                if (currentData.geometry) viewer.loadGeometry(currentData);
                 if (currentData.toolpaths) viewer.renderToolpaths(currentData.toolpaths);
                 if (currentData.rawText) {
                     currentData.rawText = updateText(currentData.rawText, xOff, yOff, zOff);
