@@ -67,6 +67,14 @@ body {
     font-size: 12px;
     transition: background 0.2s;
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tool-button svg {
+    width: 16px;
+    height: 16px;
 }
 
 .tool-button:hover, #upload-button:hover {
@@ -75,6 +83,11 @@ body {
 
 .tool-button.active {
     background: #357ab8;
+}
+
+.tool-button.disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
 }
 
 .tool-button[data-tooltip]:hover:after {
