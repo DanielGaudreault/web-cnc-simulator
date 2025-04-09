@@ -51,6 +51,7 @@
             cursor: pointer;
             font-size: 12px;
             transition: background 0.2s;
+            position: relative;
         }
 
         .tool-button:hover, #upload-button:hover {
@@ -59,6 +60,21 @@
 
         .tool-button.active {
             background: #357ab8;
+        }
+
+        .tool-button[data-tooltip]:hover:after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 1000;
         }
 
         #sidebar {
@@ -89,6 +105,7 @@
             border-radius: 4px;
             padding: 5px;
             box-sizing: border-box;
+            background: #fafafa;
         }
 
         #info-panel {
@@ -136,6 +153,7 @@
             justify-content: center;
             align-items: center;
             color: white;
+            flex-direction: context;
         }
 
         .loading-spinner {
@@ -145,6 +163,7 @@
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
+            margin-bottom: 10px;
         }
 
         @keyframes spin {
@@ -162,6 +181,19 @@
                 padding: 5px;
             }
         }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #fff;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        #speed-slider {
+            width: 100px;
+        }
     </style>
 </head>
 <body>
@@ -178,6 +210,7 @@
                 <div class="info-item"><span class="info-label">Toolpaths:</span><span id="toolpath-count">0</span></div>
                 <div class="info-item"><span class="info-label">Bounds:</span><span id="bounds">N/A</span></div>
                 <div class="info-item"><span class="info-label">Units:</span><span id="units">N/A</span></div>
+                <div class="info-item"><span class="info-label">Current Tool:</span><span id="current-tool">N/A</span></div>
             </div>
         </div>
 
@@ -189,9 +222,17 @@
         <div class="toolbar">
             <button id="upload-button">Upload File</button>
             <button class="tool-button" id="view-toggle" data-tooltip="Toggle 2D/3D">2D/3D</button>
-            <button class="tool-button" id="simulate" data-tooltip="Simulate Toolpath">Simulate</button>
+            <button class="tool-button" id="play-btn" data-tooltip="Play/Pause Simulation">▶</button>
+            <button class="tool-button" id="stop-btn" data-tooltip="Stop Simulation">■</button>
+            <button class="tool-button" id="skip-back" data-tooltip="Previous Toolpath">◄◄</button>
+            <button class="tool-button" id="skip-forward" data-tooltip="Next Toolpath">►►</button>
+            <div class="speed-control">
+                <label for="speed-slider" style="font-size: 12px;">Speed:</label>
+                <input type="range" id="speed-slider" min="0.01" max="0.5" step="0.01" value="0.05">
+            </div>
             <button class="tool-button" id="reset-view" data-tooltip="Reset View">Reset</button>
             <button class="tool-button" id="toggle-material" data-tooltip="Show/Hide Material">Material</button>
+            <button class="tool-button" id="export-btn" data-tooltip="Export as STL">Export</button>
         </div>
 
         <div id="loading-overlay" class="loading-overlay">
@@ -202,9 +243,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/exporters/STLExporter.js"></script>
 
     <script>
-        // MCAM Parser with Fallback
         class McamParser {
             constructor(buffer) {
                 this.buffer = buffer;
@@ -348,7 +389,6 @@
             }
         }
 
-        // G-code Parser for Haas and Okuma Genos
         class GcodeParser {
             constructor(text) {
                 this.text = text;
@@ -392,7 +432,6 @@
             }
         }
 
-        // CNC Viewer Class
         class CNCViewer {
             constructor() {
                 this.canvas2D = document.getElementById('canvas-2d');
@@ -403,9 +442,11 @@
                 this.controls = new THREE.OrbitControls(this.camera3D, this.renderer3D.domElement);
                 this.toolpaths = [];
                 this.is2DView = false;
-                this.showMaterial = false; // Default to false
+                this.showMaterial = false;
                 this.materialMesh = null;
                 this.animating = false;
+                this.animationFrameId = null;
+                this.currentToolNumber = 'N/A';
                 this.init();
             }
 
@@ -443,7 +484,7 @@
 
             loadToolpaths(toolpaths) {
                 this.toolpaths = toolpaths;
-                this.showMaterial = true; // Enable material when toolpaths are loaded
+                this.showMaterial = true;
                 this.render2D();
                 this.render3D();
                 this.loadMaterial();
@@ -519,7 +560,12 @@
                 const height = Math.max(maxY - minY + 10, 50);
                 const depth = Math.max(maxZ - minZ + 10, 50);
                 const geometry = new THREE.BoxGeometry(width, height, depth);
-                const material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.7 });
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: 0xaaaaaa, 
+                    transparent: true, 
+                    opacity: 0.7,
+                    shininess: 30
+                });
                 this.materialMesh = new THREE.Mesh(geometry, material);
                 this.materialMesh.position.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
                 this.scene.add(this.materialMesh);
@@ -551,30 +597,81 @@
             startSimulation() {
                 if (!this.toolpaths.length) return;
                 this.animating = true;
-                this.animationData = { currentPath: 0, currentPoint: 0, speed: 0.05 };
+                if (!this.animationData) {
+                    this.animationData = { 
+                        currentPath: 0, 
+                        currentPoint: 0, 
+                        speed: 0.05,
+                        direction: 1
+                    };
+                }
+                this.playBtn.classList.add('active');
             }
 
             stopSimulation() {
                 this.animating = false;
+                if (this.animationFrameId) {
+                    cancelAnimationFrame(this.animationFrameId);
+                }
+                this.playBtn.classList.remove('active');
+            }
+
+            skipForward() {
+                if (!this.toolpaths.length || !this.animationData) return;
+                this.animationData.currentPath = Math.min(
+                    this.toolpaths.length - 1,
+                    this.animationData.currentPath + 1
+                );
+                this.animationData.currentPoint = 0;
+                if (!this.animating) this.updateSimulation();
+            }
+
+            skipBackward() {
+                if (!this.toolpaths.length || !this.animationData) return;
+                this.animationData.currentPath = Math.max(0, this.animationData.currentPath - 1);
+                this.animationData.currentPoint = 0;
+                if (!this.animating) this.updateSimulation();
+            }
+
+            setSpeed(speed) {
+                if (this.animationData) {
+                    this.animationData.speed = parseFloat(speed);
+                }
+            }
+
+            exportToSTL() {
+                if (!this.materialMesh) return;
+                const exporter = new THREE.STLExporter();
+                const stlString = exporter.parse(this.materialMesh);
+                const blob = new Blob([stlString], { type: 'text/plain' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'cnc_model.stl';
+                link.click();
             }
 
             updateSimulation() {
-                if (!this.animating) return;
-                const { currentPath, currentPoint } = this.animationData;
-                if (currentPath >= this.toolpaths.length) {
+                if (!this.animating || !this.animationData) return;
+                const { currentPath, currentPoint, speed, direction } = this.animationData;
+                
+                if (currentPath >= this.toolpaths.length || currentPath < 0) {
                     this.stopSimulation();
                     return;
                 }
 
                 const path = this.toolpaths[currentPath];
                 const pointIndex = Math.floor(currentPoint);
-                if (pointIndex >= path.points.length) {
-                    this.animationData.currentPath++;
-                    this.animationData.currentPoint = 0;
+                
+                if (pointIndex >= path.points.length || pointIndex < 0) {
+                    this.animationData.currentPath += direction;
+                    this.animationData.currentPoint = direction > 0 ? 0 : path.points.length - 1;
                     return;
                 }
 
                 const point = path.points[pointIndex];
+                this.currentToolNumber = path.toolNumber;
+                document.getElementById('current-tool').textContent = this.currentToolNumber;
+
                 if (this.is2DView) {
                     this.render2D();
                     const scale = Math.min(this.canvas2D.width, this.canvas2D.height) / 100;
@@ -596,20 +693,23 @@
                     setTimeout(() => this.scene.remove(tool), 100);
                 }
 
-                this.animationData.currentPoint += this.animationData.speed;
+                this.animationData.currentPoint += speed * direction;
             }
 
             animate() {
-                requestAnimationFrame(() => this.animate());
+                this.animationFrameId = requestAnimationFrame(() => this.animate());
                 this.updateSimulation();
                 if (!this.is2DView) {
                     this.controls.update();
                     this.renderer3D.render(this.scene, this.camera3D);
                 }
             }
+
+            setPlayButton(button) {
+                this.playBtn = button;
+            }
         }
 
-        // File Format Detection
         function detectFileFormat(buffer, fileName) {
             const header = new Uint8Array(buffer.slice(0, 4));
             const headerStr = String.fromCharCode(...header);
@@ -621,17 +721,23 @@
             return 'UNKNOWN';
         }
 
-        // Main Application
         document.addEventListener('DOMContentLoaded', () => {
             const viewer = new CNCViewer();
             const uploadButton = document.getElementById('upload-button');
             const fileInput = document.getElementById('file-input');
             const gcodeInput = document.getElementById('gcode-input');
             const viewToggleBtn = document.getElementById('view-toggle');
-            const simulateBtn = document.getElementById('simulate');
+            const playBtn = document.getElementById('play-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const skipBackBtn = document.getElementById('skip-back');
+            const skipForwardBtn = document.getElementById('skip-forward');
+            const speedSlider = document.getElementById('speed-slider');
             const resetViewBtn = document.getElementById('reset-view');
             const toggleMaterialBtn = document.getElementById('toggle-material');
+            const exportBtn = document.getElementById('export-btn');
             const loadingOverlay = document.getElementById('loading-overlay');
+
+            viewer.setPlayButton(playBtn);
 
             uploadButton.addEventListener('click', () => {
                 console.log('Upload button clicked');
@@ -720,14 +826,28 @@
                 viewToggleBtn.classList.toggle('active');
             });
 
-            simulateBtn.addEventListener('click', () => {
+            playBtn.addEventListener('click', () => {
                 if (viewer.animating) {
                     viewer.stopSimulation();
-                    simulateBtn.classList.remove('active');
                 } else {
                     viewer.startSimulation();
-                    simulateBtn.classList.add('active');
                 }
+            });
+
+            stopBtn.addEventListener('click', () => {
+                viewer.stopSimulation();
+            });
+
+            skipForwardBtn.addEventListener('click', () => {
+                viewer.skipForward();
+            });
+
+            skipBackBtn.addEventListener('click', () => {
+                viewer.skipBackward();
+            });
+
+            speedSlider.addEventListener('input', (e) => {
+                viewer.setSpeed(e.target.value);
             });
 
             resetViewBtn.addEventListener('click', () => viewer.resetView());
@@ -737,8 +857,11 @@
                 toggleMaterialBtn.classList.toggle('active');
             });
 
-            // No sample G-code loaded by default
-            gcodeInput.value = ''; // Clear initial G-code
+            exportBtn.addEventListener('click', () => {
+                viewer.exportToSTL();
+            });
+
+            gcodeInput.value = '';
         });
     </script>
 </body>
