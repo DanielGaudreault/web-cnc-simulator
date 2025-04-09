@@ -39,7 +39,7 @@
             padding: 8px;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            flex-wrap: wrap; /* Allow wrapping on small screens */
+            flex-wrap: wrap;
         }
 
         .tool-button, #upload-button {
@@ -62,7 +62,7 @@
         }
 
         #sidebar {
-            width: 320px; /* Slightly wider for better fit */
+            width: 320px;
             min-width: 200px;
             height: 100%;
             background: #fff;
@@ -81,8 +81,8 @@
 
         #gcode-input {
             width: 100%;
-            height: 60%; /* Increased height */
-            resize: vertical; /* Allow vertical resize */
+            height: 60%;
+            resize: vertical;
             font-family: monospace;
             font-size: 12px;
             border: 1px solid #ddd;
@@ -152,7 +152,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Responsive adjustments */
         @media (max-width: 768px) {
             #sidebar {
                 width: 250px;
@@ -229,7 +228,6 @@
                     return { success: true, header, geometry, toolpaths };
                 } catch (error) {
                     console.error('MCAM Binary Parsing Failed:', error.message);
-                    // Fallback: Try parsing as text (e.g., NCI or G-code inside)
                     const text = new TextDecoder().decode(this.buffer);
                     console.log('MCAM Fallback: First 100 chars:', text.slice(0, 100));
                     const gcodeParser = new GcodeParser(text);
@@ -405,7 +403,7 @@
                 this.controls = new THREE.OrbitControls(this.camera3D, this.renderer3D.domElement);
                 this.toolpaths = [];
                 this.is2DView = false;
-                this.showMaterial = true;
+                this.showMaterial = false; // Default to false
                 this.materialMesh = null;
                 this.animating = false;
                 this.init();
@@ -445,6 +443,7 @@
 
             loadToolpaths(toolpaths) {
                 this.toolpaths = toolpaths;
+                this.showMaterial = true; // Enable material when toolpaths are loaded
                 this.render2D();
                 this.render3D();
                 this.loadMaterial();
@@ -536,7 +535,7 @@
             toggleMaterial() {
                 this.showMaterial = !this.showMaterial;
                 if (this.materialMesh) this.materialMesh.visible = this.showMaterial;
-                if (this.showMaterial && !this.materialMesh) this.loadMaterial();
+                if (this.showMaterial && !this.materialMesh && this.toolpaths.length) this.loadMaterial();
             }
 
             resetView() {
@@ -738,13 +737,8 @@
                 toggleMaterialBtn.classList.toggle('active');
             });
 
-            // Load sample G-code for Haas/Okuma
-            const sampleGcode = `G21\nT1\nG0 X0 Y0 Z10 A0\nG1 X10 Y10 Z5 A90 F100\nG1 X20 Y20 Z0 A180\nG0 X0 Y0 Z10 A0`;
-            gcodeInput.value = sampleGcode;
-            const parser = new GcodeParser(sampleGcode);
-            const data = parser.parse();
-            viewer.loadToolpaths(data.toolpaths);
-            updateInfo(null, data);
+            // No sample G-code loaded by default
+            gcodeInput.value = ''; // Clear initial G-code
         });
     </script>
 </body>
