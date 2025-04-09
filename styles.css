@@ -116,6 +116,8 @@ body {
     box-sizing: border-box;
     flex-shrink: 0;
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 #sidebar h3 {
@@ -124,21 +126,8 @@ body {
     font-size: 14px;
 }
 
-#gcode-input {
-    width: 100%;
-    height: 60%;
-    resize: vertical;
-    font-family: monospace;
-    font-size: 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 5px;
-    box-sizing: border-box;
-    background: #fafafa;
-}
-
 #info-panel {
-    margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 .info-item {
@@ -150,6 +139,20 @@ body {
     font-weight: bold;
     display: inline-block;
     width: 100px;
+}
+
+#gcode-input {
+    width: 100%;
+    flex-grow: 1;
+    resize: none;
+    font-family: monospace;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+    box-sizing: border-box;
+    background: #fafafa;
+    margin-bottom: 10px;
 }
 
 #canvas-container {
@@ -233,25 +236,6 @@ body {
     align-items: center;
 }
 
-.viewcube-controls {
-    display: flex;
-    gap: 5px;
-    margin-bottom: 5px;
-}
-
-.viewcube-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 5px;
-    color: #4a90e2;
-    font-size: 12px;
-}
-
-.viewcube-btn:hover {
-    color: #357ab8;
-}
-
 #vc-home {
     background: none;
     border: none;
@@ -324,9 +308,6 @@ body {
     padding: 5px;
     border-radius: 4px;
     justify-content: flex-end;
-    position: absolute;
-    bottom: 15px;
-    right: 15px;
 }
 
 .nc-btn {
