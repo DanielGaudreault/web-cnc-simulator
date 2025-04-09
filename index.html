@@ -21,25 +21,6 @@
             display: flex;
         }
 
-        #upload-button {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1000; /* Increased z-index to ensure it’s on top */
-            padding: 10px 20px; /* Larger padding for visibility */
-            background: #4a90e2;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px; /* Larger font size */
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Shadow for depth */
-        }
-
-        #upload-button:hover {
-            background: #357ab8;
-        }
-
         #file-input {
             display: none; /* Hidden, triggered by button */
         }
@@ -57,7 +38,7 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .tool-button {
+        .tool-button, #upload-button {
             background: #4a90e2;
             color: white;
             border: none;
@@ -67,7 +48,7 @@
             font-size: 12px;
         }
 
-        .tool-button:hover {
+        .tool-button:hover, #upload-button:hover {
             background: #357ab8;
         }
 
@@ -141,7 +122,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
-            z-index: 2000; /* Higher than button */
+            z-index: 2000;
             display: none;
             justify-content: center;
             align-items: center;
@@ -165,7 +146,6 @@
 </head>
 <body>
     <div id="viewer-container">
-        <button id="upload-button">Upload File</button>
         <input type="file" id="file-input" accept=".gcode,.mcam,.nc,.tap" />
 
         <div id="sidebar">
@@ -187,6 +167,7 @@
         </div>
 
         <div class="toolbar">
+            <button id="upload-button">Upload File</button>
             <button class="tool-button" id="view-toggle" data-tooltip="Toggle 2D/3D">2D/3D</button>
             <button class="tool-button" id="simulate" data-tooltip="Simulate Toolpath">Simulate</button>
             <button class="tool-button" id="reset-view" data-tooltip="Reset View">Reset</button>
@@ -203,7 +184,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // MCAM Parser
+        // MCAM Parser with Enhanced Debugging
         class McamParser {
             constructor(buffer) {
                 this.buffer = buffer;
@@ -214,26 +195,40 @@
             }
 
             parse() {
+                console.log('Parsing MCAM file, size:', this.buffer.byteLength);
                 try {
                     this.checkFileSize();
                     const header = this.parseHeader();
+                    console.log('Header:', header);
                     if (!this.supportedVersions.includes(header.version)) throw new Error(`Unsupported MCAM version ${header.version}`);
                     const geometry = this.parseGeometry(header.version);
+                    console.log('Geometry parsed, vertices:', geometry.vertices.length / 3, 'faces:', geometry.faces.length / 3);
                     const toolpaths = this.parseToolpaths(header.version);
+                    console.log('Toolpaths parsed:', toolpaths.length);
                     return { success: true, header, geometry, toolpaths };
                 } catch (error) {
+                    console.error('MCAM parsing error:', error.message);
                     return { success: false, error: error.message };
                 }
             }
 
-            checkFileSize() { if (this.buffer.byteLength < 16) throw new Error('File too small'); }
+            checkFileSize() { 
+                if (this.buffer.byteLength < 16) throw new Error('File too small');
+            }
+
             parseHeader() {
                 const magic = this.readString(4);
+                console.log('Magic:', magic);
                 if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
                 const version = this.readUint32();
                 const fileSize = this.readUint32();
                 if (fileSize > this.buffer.byteLength) throw new Error('File size mismatch');
-                return { version, fileSize, creationDate: this.readUint64(), units: this.readByte() === 0 ? 'mm' : 'inch' };
+                return { 
+                    version, 
+                    fileSize, 
+                    creationDate: this.readUint64(), 
+                    units: this.readByte() === 0 ? 'mm' : 'inch' 
+                };
             }
 
             parseGeometry(version) {
@@ -241,6 +236,7 @@
                 if (vertexCount > 1000000) throw new Error('Excessive vertex count');
                 const vertices = new Float32Array(vertexCount * 3);
                 for (let i = 0; i < vertexCount; i++) {
+                    if (this.offset + 12 > this.buffer.byteLength) throw new Error('Unexpected end of file at vertices');
                     vertices[i * 3] = this.readFloat();
                     vertices[i * 3 + 1] = this.readFloat();
                     vertices[i * 3 + 2] = this.readFloat();
@@ -249,6 +245,7 @@
                 if (faceCount > 2000000) throw new Error('Excessive face count');
                 const faces = new Uint32Array(faceCount * 3);
                 for (let i = 0; i < faceCount; i++) {
+                    if (this.offset + 12 > this.buffer.byteLength) throw new Error('Unexpected end of file at faces');
                     faces[i * 3] = this.readUint32();
                     faces[i * 3 + 1] = this.readUint32();
                     faces[i * 3 + 2] = this.readUint32();
@@ -257,9 +254,11 @@
             }
 
             parseToolpaths(version) {
+                if (this.offset + 2 > this.buffer.byteLength) throw new Error('Unexpected end of file at toolpath count');
                 const pathCount = this.readUint16();
                 const toolpaths = [];
                 for (let i = 0; i < pathCount; i++) {
+                    if (this.offset + 6 > this.buffer.byteLength) throw new Error('Unexpected end of file at toolpath header');
                     toolpaths.push({ toolNumber: this.readUint16(), points: this.readPathPoints() });
                 }
                 return toolpaths;
@@ -269,23 +268,50 @@
                 const pointCount = this.readUint32();
                 const points = [];
                 for (let i = 0; i < pointCount; i++) {
+                    if (this.offset + 16 > this.buffer.byteLength) throw new Error('Unexpected end of file at toolpath points');
                     points.push({ 
                         x: this.readFloat(), 
                         y: this.readFloat(), 
                         z: this.readFloat(), 
                         feedRate: this.readFloat(),
-                        a: 0
+                        a: 0 // Adjust if your MCAM includes A-axis data
                     });
                 }
                 return points;
             }
 
-            readUint32() { const v = this.dataView.getUint32(this.offset, this.littleEndian); this.offset += 4; return v; }
-            readUint16() { const v = this.dataView.getUint16(this.offset, this.littleEndian); this.offset += 2; return v; }
-            readFloat() { const v = this.dataView.getFloat32(this.offset, this.littleEndian); this.offset += 4; return v; }
-            readByte() { const v = this.dataView.getUint8(this.offset); this.offset += 1; return v; }
-            readUint64() { const l = this.readUint32(); const r = this.readUint32(); return l + 2 ** 32 * r; }
+            readUint32() { 
+                if (this.offset + 4 > this.buffer.byteLength) throw new Error('Buffer overflow at Uint32');
+                const v = this.dataView.getUint32(this.offset, this.littleEndian); 
+                this.offset += 4; 
+                return v; 
+            }
+            readUint16() { 
+                if (this.offset + 2 > this.buffer.byteLength) throw new Error('Buffer overflow at Uint16');
+                const v = this.dataView.getUint16(this.offset, this.littleEndian); 
+                this.offset += 2; 
+                return v; 
+            }
+            readFloat() { 
+                if (this.offset + 4 > this.buffer.byteLength) throw new Error('Buffer overflow at Float');
+                const v = this.dataView.getFloat32(this.offset, this.littleEndian); 
+                this.offset += 4; 
+                return v; 
+            }
+            readByte() { 
+                if (this.offset + 1 > this.buffer.byteLength) throw new Error('Buffer overflow at Byte');
+                const v = this.dataView.getUint8(this.offset); 
+                this.offset += 1; 
+                return v; 
+            }
+            readUint64() { 
+                if (this.offset + 8 > this.buffer.byteLength) throw new Error('Buffer overflow at Uint64');
+                const l = this.readUint32(); 
+                const r = this.readUint32(); 
+                return l + 2 ** 32 * r; 
+            }
             readString(length) {
+                if (this.offset + length > this.buffer.byteLength) throw new Error('Buffer overflow at String');
                 let result = '';
                 for (let i = 0; i < length; i++) {
                     const char = this.readByte();
@@ -561,6 +587,7 @@
             const headerStr = String.fromCharCode(...header);
             const ext = fileName.split('.').pop().toLowerCase();
 
+            console.log('File header:', headerStr, 'Extension:', ext);
             if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
             if (ext === 'gcode' || ext === 'nc' || ext === 'tap' || headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
             return 'UNKNOWN';
@@ -578,9 +605,8 @@
             const toggleMaterialBtn = document.getElementById('toggle-material');
             const loadingOverlay = document.getElementById('loading-overlay');
 
-            // Ensure button triggers file input
             uploadButton.addEventListener('click', () => {
-                console.log('Upload button clicked'); // Debug log
+                console.log('Upload button clicked');
                 fileInput.click();
             });
 
@@ -612,6 +638,8 @@
                 reader.onload = () => {
                     const buffer = reader.result;
                     const format = detectFileFormat(buffer, file.name);
+
+                    console.log('Detected format:', format);
 
                     if (format === 'MCAM') {
                         const parser = new McamParser(buffer);
@@ -646,7 +674,7 @@
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    console.log('File selected:', file.name); // Debug log
+                    console.log('File selected:', file.name);
                     loadFile(file);
                 }
             });
