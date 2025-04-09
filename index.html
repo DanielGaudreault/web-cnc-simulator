@@ -257,6 +257,35 @@
         #viewcube canvas {
             border: 1px solid #ddd;
         }
+
+        .control-icons {
+            display: flex;
+            gap: 5px;
+            background: #fff;
+            padding: 5px;
+            border-radius: 4px;
+            justify-content: flex-end;
+        }
+
+        .icon {
+            cursor: pointer;
+            padding: 5px;
+            color: #4a90e2;
+            transition: color 0.2s;
+        }
+
+        .icon:hover {
+            color: #357ab8;
+        }
+
+        .icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .icon.active svg {
+            color: #357ab8;
+        }
     </style>
 </head>
 <body>
@@ -286,17 +315,100 @@
             <div class="toolbar-buttons">
                 <button id="upload-button">Upload File</button>
                 <button class="tool-button" id="view-toggle" data-tooltip="Toggle 2D/3D">2D/3D</button>
-                <button class="tool-button" id="play-btn" data-tooltip="Play/Pause Simulation">▶</button>
-                <button class="tool-button" id="stop-btn" data-tooltip="Stop Simulation">■</button>
-                <button class="tool-button" id="skip-back" data-tooltip="Previous Toolpath">◄◄</button>
-                <button class="tool-button" id="skip-forward" data-tooltip="Next Toolpath">►►</button>
                 <div class="speed-control">
                     <label for="speed-slider" style="font-size: 12px;">Speed:</label>
-                    <input type="range" id="speed-slider" min="0.01" max="0.5" step="0.01" value="0.05">
+                    <input type="range" id="speed-slider" min="0.01" max="1" step="0.01" value="0.05">
                 </div>
                 <button class="tool-button" id="reset-view" data-tooltip="Reset View">Reset</button>
                 <button class="tool-button" id="toggle-material" data-tooltip="Show/Hide Material">Material</button>
                 <button class="tool-button" id="export-btn" data-tooltip="Export as STL">Export</button>
+            </div>
+            <div class="control-icons">
+                <div id="ctrl-fastrewind" class="icon">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="fast-backward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-fast-backward fa-w-16" style="transform-origin:0.5em 0.5em;">
+                        <g transform="translate(256 256)" class="">
+                            <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                <path fill="currentColor" d="M0 436V76c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12v151.9L235.5 71.4C256.1 54.3 288 68.6 288 96v131.9L459.5 71.4C480.1 54.3 512 68.6 512 96v320c0 27.4-31.9 41.7-52.5 24.6L288 285.3V416c0 27.4-31.9 41.7-52.5 24.6L64 285.3V436c0 6.6-5.4 12-12 12H12c-6.6 0-12-5.4-12-12z" transform="translate(-256 -256)" class=""></path>
+                            </g>
+                        </g>
+                    </svg>
+                </div>
+                <div id="ctrl-rewind" class="icon">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="step-backward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="svg-inline--fa fa-step-backward fa-w-14" style="transform-origin:0.4375em 0.5em;">
+                        <g transform="translate(224 256)" class="">
+                            <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                <path fill="currentColor" d="M64 468V44c0-6.6 5.4-12 12-12h48c6.6 0 12 5.4 12 12v176.4l195.5-181C352.1 22.3 384 36.6 384 64v384c0 27.4-31.9 41.7-52.5 24.6L136 292.7V468c0 6.6-5.4 12-12 12H76c-6.6 0-12-5.4-12-12z" transform="translate(-224 -256)" class=""></path>
+                            </g>
+                        </g>
+                    </svg>
+                </div>
+                <div id="ctrl-play-reverse" class="icon">
+                    <div style="display:;">
+                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="play" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="play-btn-reverse" class="svg-inline--fa fa-play fa-w-14 fa-fw" style="transform-origin:0.4375em 0.5em;">
+                            <g transform="translate(224 256)" class="">
+                                <g transform="translate(0, 0)  scale(-1.125, 1.125)  rotate(0 0 0)" class="">
+                                    <path fill="currentColor" d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z" transform="translate(-224 -256)" class=""></path>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                    <div style="display:none;">
+                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="pause" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="pause-btn-reverse" class="svg-inline--fa fa-pause fa-w-14 fa-fw" style="transform-origin:0.4375em 0.5em;">
+                            <g transform="translate(224 256)" class="">
+                                <g transform="translate(0, 0)  scale(-1.125, 1.125)  rotate(0 0 0)" class="">
+                                    <path fill="currentColor" d="M144 479H48c-26.5 0-48-21.5-48-48V79c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v352c0 26.5-21.5 48-48 48zm304-48V79c0-26.5-21.5-48-48-48h-96c-26.5 0-48 21.5-48 48v352c0 26.5 21.5 48 48 48h96c26.5 0 48-21.5 48-48z" transform="translate(-224 -256)" class=""></path>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+                <div id="ctrl-stop" class="icon">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="stop" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="svg-inline--fa fa-stop fa-w-14 fa-fw" style="transform-origin:0.4375em 0.5em;">
+                        <g transform="translate(224 256)" class="">
+                            <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                <path fill="currentColor" d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z" transform="translate(-224 -256)" class=""></path>
+                            </g>
+                        </g>
+                    </svg>
+                </div>
+                <div id="ctrl-play" class="icon">
+                    <div style="display:;">
+                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="play" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="play-btn" class="svg-inline--fa fa-play fa-w-14 fa-fw" style="transform-origin:0.4375em 0.5em;">
+                            <g transform="translate(224 256)" class="">
+                                <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                    <path fill="currentColor" d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z" transform="translate(-224 -256)" class=""></path>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                    <div style="display:none;">
+                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="pause" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="pause-btn" class="svg-inline--fa fa-pause fa-w-14 fa-fw" style="transform-origin:0.4375em 0.5em;">
+                            <g transform="translate(224 256)" class="">
+                                <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                    <path fill="currentColor" d="M144 479H48c-26.5 0-48-21.5-48-48V79c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v352c0 26.5-21.5 48-48 48zm304-48V79c0-26.5-21.5-48-48-48h-96c-26.5 0-48 21.5-48 48v352c0 26.5 21.5 48 48 48h96c26.5 0 48-21.5 48-48z" transform="translate(-224 -256)" class=""></path>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+                <div id="ctrl-fwd" class="icon">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="step-forward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="svg-inline--fa fa-step-forward fa-w-14" style="transform-origin:0.4375em 0.5em;">
+                        <g transform="translate(224 256)" class="">
+                            <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                <path fill="currentColor" d="M384 44v424c0 6.6-5.4 12-12 12h-48c-6.6 0-12-5.4-12-12V291.6l-195.5 181C95.9 489.7 64 475.4 64 448V64c0-27.4 31.9-41.7 52.5-24.6L312 219.3V44c0-6.6 5.4-12 12-12h48c6.6 0 12 5.4 12 12z" transform="translate(-224 -256)" class=""></path>
+                            </g>
+                        </g>
+                    </svg>
+                </div>
+                <div id="ctrl-fastfwd" class="icon">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="fast-forward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-fast-forward fa-w-16" style="transform-origin:0.5em 0.5em;">
+                        <g transform="translate(256 256)" class="">
+                            <g transform="translate(0, 0)  scale(1.125, 1.125)  rotate(0 0 0)" class="">
+                                <path fill="currentColor" d="M512 76v360c0 6.6-5.4 12-12 12h-40c-6.6 0-12-5.4-12-12V284.1L276.5 440.6c-20.6 17.2-52.5 2.8-52.5-24.6V284.1L52.5 440.6C31.9 457.8 0 443.4 0 416V96c0-27.4 31.9-41.7 52.5-24.6L224 226.8V96c0-27.4 31.9-41.7 52.5-24.6L448 226.8V76c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12z" transform="translate(-256 -256)" class=""></path>
+                            </g>
+                        </g>
+                    </svg>
+                </div>
             </div>
             <div id="viewcube">
                 <div class="viewcube-controls">
@@ -694,7 +806,7 @@
 
             setView(view) {
                 if (this.is2DView) return;
-                const distance = 75; // Distance from origin
+                const distance = 75;
                 switch (view) {
                     case 'top':
                         this.camera3D.position.set(0, distance, 0);
@@ -718,18 +830,21 @@
                 this.viewcubeCamera.lookAt(0, 0, 0);
             }
 
-            startSimulation() {
+            startSimulation(direction = 1) {
                 if (!this.toolpaths.length) return;
                 this.animating = true;
                 if (!this.animationData) {
                     this.animationData = { 
-                        currentPath: 0, 
-                        currentPoint: 0, 
+                        currentPath: direction > 0 ? 0 : this.toolpaths.length - 1, 
+                        currentPoint: direction > 0 ? 0 : this.toolpaths[direction > 0 ? 0 : this.toolpaths.length - 1].points.length - 1, 
                         speed: 0.05,
-                        direction: 1
+                        direction
                     };
+                } else {
+                    this.animationData.direction = direction;
                 }
-                this.playBtn.classList.add('active');
+                document.getElementById(direction > 0 ? 'ctrl-play' : 'ctrl-play-reverse').classList.add('active');
+                this.togglePlayPause(direction > 0 ? 'ctrl-play' : 'ctrl-play-reverse', true);
             }
 
             stopSimulation() {
@@ -737,24 +852,35 @@
                 if (this.animationFrameId) {
                     cancelAnimationFrame(this.animationFrameId);
                 }
-                this.playBtn.classList.remove('active');
+                document.getElementById('ctrl-play').classList.remove('active');
+                document.getElementById('ctrl-play-reverse').classList.remove('active');
+                this.togglePlayPause('ctrl-play', false);
+                this.togglePlayPause('ctrl-play-reverse', false);
             }
 
-            skipForward() {
+            skipBackward(steps = 1) {
+                if (!this.toolpaths.length || !this.animationData) return;
+                this.animationData.currentPath = Math.max(0, this.animationData.currentPath - steps);
+                this.animationData.currentPoint = 0;
+                if (!this.animating) this.updateSimulation();
+            }
+
+            skipForward(steps = 1) {
                 if (!this.toolpaths.length || !this.animationData) return;
                 this.animationData.currentPath = Math.min(
                     this.toolpaths.length - 1,
-                    this.animationData.currentPath + 1
+                    this.animationData.currentPath + steps
                 );
                 this.animationData.currentPoint = 0;
                 if (!this.animating) this.updateSimulation();
             }
 
-            skipBackward() {
-                if (!this.toolpaths.length || !this.animationData) return;
-                this.animationData.currentPath = Math.max(0, this.animationData.currentPath - 1);
-                this.animationData.currentPoint = 0;
-                if (!this.animating) this.updateSimulation();
+            fastRewind() {
+                this.skipBackward(5); // Skip 5 toolpaths back
+            }
+
+            fastForward() {
+                this.skipForward(5); // Skip 5 toolpaths forward
             }
 
             setSpeed(speed) {
@@ -772,6 +898,13 @@
                 link.href = URL.createObjectURL(blob);
                 link.download = 'cnc_model.stl';
                 link.click();
+            }
+
+            togglePlayPause(buttonId, isPlaying) {
+                const playBtn = document.getElementById(`${buttonId === 'ctrl-play' ? 'play-btn' : 'play-btn-reverse'}`);
+                const pauseBtn = document.getElementById(`${buttonId === 'ctrl-play' ? 'pause-btn' : 'pause-btn-reverse'}`);
+                playBtn.style.display = isPlaying ? 'none' : '';
+                pauseBtn.style.display = isPlaying ? '' : 'none';
             }
 
             updateSimulation() {
@@ -826,18 +959,12 @@
                 if (!this.is2DView) {
                     this.controls.update();
                     this.renderer3D.render(this.scene, this.camera3D);
-
-                    // Sync viewcube with main camera
                     const cameraDirection = new THREE.Vector3();
                     this.camera3D.getWorldDirection(cameraDirection);
                     this.viewcubeCamera.position.copy(cameraDirection).multiplyScalar(-2).add(new THREE.Vector3(0, 0, 0));
                     this.viewcubeCamera.lookAt(0, 0, 0);
                     this.viewcubeRenderer.render(this.viewcubeScene, this.viewcubeCamera);
                 }
-            }
-
-            setPlayButton(button) {
-                this.playBtn = button;
             }
         }
 
@@ -858,10 +985,13 @@
             const fileInput = document.getElementById('file-input');
             const gcodeInput = document.getElementById('gcode-input');
             const viewToggleBtn = document.getElementById('view-toggle');
-            const playBtn = document.getElementById('play-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            const skipBackBtn = document.getElementById('skip-back');
-            const skipForwardBtn = document.getElementById('skip-forward');
+            const ctrlFastRewind = document.getElementById('ctrl-fastrewind');
+            const ctrlRewind = document.getElementById('ctrl-rewind');
+            const ctrlPlayReverse = document.getElementById('ctrl-play-reverse');
+            const ctrlStop = document.getElementById('ctrl-stop');
+            const ctrlPlay = document.getElementById('ctrl-play');
+            const ctrlFwd = document.getElementById('ctrl-fwd');
+            const ctrlFastFwd = document.getElementById('ctrl-fastfwd');
             const speedSlider = document.getElementById('speed-slider');
             const resetViewBtn = document.getElementById('reset-view');
             const toggleMaterialBtn = document.getElementById('toggle-material');
@@ -871,8 +1001,6 @@
             const vcFrontBtn = document.getElementById('vc-front');
             const vcRightBtn = document.getElementById('vc-right');
             const loadingOverlay = document.getElementById('loading-overlay');
-
-            viewer.setPlayButton(playBtn);
 
             uploadButton.addEventListener('click', () => {
                 console.log('Upload button clicked');
@@ -961,24 +1089,42 @@
                 viewToggleBtn.classList.toggle('active');
             });
 
-            playBtn.addEventListener('click', () => {
-                if (viewer.animating) {
+            ctrlFastRewind.addEventListener('click', () => {
+                viewer.fastRewind();
+            });
+
+            ctrlRewind.addEventListener('click', () => {
+                viewer.skipBackward();
+            });
+
+            ctrlPlayReverse.addEventListener('click', () => {
+                if (viewer.animating && viewer.animationData.direction < 0) {
                     viewer.stopSimulation();
                 } else {
-                    viewer.startSimulation();
+                    viewer.stopSimulation();
+                    viewer.startSimulation(-1);
                 }
             });
 
-            stopBtn.addEventListener('click', () => {
+            ctrlStop.addEventListener('click', () => {
                 viewer.stopSimulation();
             });
 
-            skipForwardBtn.addEventListener('click', () => {
+            ctrlPlay.addEventListener('click', () => {
+                if (viewer.animating && viewer.animationData.direction > 0) {
+                    viewer.stopSimulation();
+                } else {
+                    viewer.stopSimulation();
+                    viewer.startSimulation(1);
+                }
+            });
+
+            ctrlFwd.addEventListener('click', () => {
                 viewer.skipForward();
             });
 
-            skipBackBtn.addEventListener('click', () => {
-                viewer.skipBackward();
+            ctrlFastFwd.addEventListener('click', () => {
+                viewer.fastForward();
             });
 
             speedSlider.addEventListener('input', (e) => {
