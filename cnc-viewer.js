@@ -31,6 +31,7 @@ class CNCViewer {
         this.renderer3D.setSize(this.canvas2D.width, this.canvas2D.height);
         this.camera3D.position.set(50, 50, 50);
         this.camera3D.lookAt(0, 0, 0);
+        this.controls.enableDSamplers(this.controls);
         this.controls.enableDamping = true;
         this.controls.target.set(0, 0, 0);
         this.scene.add(new THREE.AmbientLight(0x404040));
