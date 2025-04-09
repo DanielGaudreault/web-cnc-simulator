@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate CNC Viewer (4-Axis)</title>
+    <title>Ultimate CNC Viewer (4-Axis with MCAM)</title>
     <style>
         body {
             margin: 0;
@@ -158,11 +158,11 @@
 </head>
 <body>
     <div id="viewer-container">
-        <input type="file" id="file-input" accept=".gcode,.mcx" />
+        <input type="file" id="file-input" accept=".gcode,.mcam" />
 
         <div id="sidebar">
             <h3>G-Code Editor</h3>
-            <textarea id="gcode-input" placeholder="Paste or edit G-code here..."></textarea>
+            <textarea id="gcode-input" placeholder="Paste or edit G-code here (MCAM files show as binary info)..."></textarea>
             <div id="info-panel">
                 <h3>File Info</h3>
                 <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
@@ -195,6 +195,98 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
 
     <script>
+        // MCAM Parser (Reintroduced from your original code)
+        class McamParser {
+            constructor(buffer) {
+                this.buffer = buffer;
+                this.dataView = new DataView(buffer);
+                this.offset = 0;
+                this.littleEndian = true;
+                this.supportedVersions = [1, 2, 3];
+            }
+
+            parse() {
+                try {
+                    this.checkFileSize();
+                    const header = this.parseHeader();
+                    if (!this.supportedVersions.includes(header.version)) throw new Error(`Unsupported MCAM version ${header.version}`);
+                    const geometry = this.parseGeometry(header.version);
+                    const toolpaths = this.parseToolpaths(header.version);
+                    return { success: true, header, geometry, toolpaths };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            checkFileSize() { if (this.buffer.byteLength < 16) throw new Error('File too small'); }
+            parseHeader() {
+                const magic = this.readString(4);
+                if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
+                const version = this.readUint32();
+                const fileSize = this.readUint32();
+                if (fileSize > this.buffer.byteLength) throw new Error('File size mismatch');
+                return { version, fileSize, creationDate: this.readUint64(), units: this.readByte() === 0 ? 'mm' : 'inch' };
+            }
+
+            parseGeometry(version) {
+                const vertexCount = this.readUint32();
+                if (vertexCount > 1000000) throw new Error('Excessive vertex count');
+                const vertices = new Float32Array(vertexCount * 3);
+                for (let i = 0; i < vertexCount; i++) {
+                    vertices[i * 3] = this.readFloat();
+                    vertices[i * 3 + 1] = this.readFloat();
+                    vertices[i * 3 + 2] = this.readFloat();
+                }
+                const faceCount = this.readUint32();
+                if (faceCount > 2000000) throw new Error('Excessive face count');
+                const faces = new Uint32Array(faceCount * 3);
+                for (let i = 0; i < faceCount; i++) {
+                    faces[i * 3] = this.readUint32();
+                    faces[i * 3 + 1] = this.readUint32();
+                    faces[i * 3 + 2] = this.readUint32();
+                }
+                return { vertices, faces };
+            }
+
+            parseToolpaths(version) {
+                const pathCount = this.readUint16();
+                const toolpaths = [];
+                for (let i = 0; i < pathCount; i++) {
+                    toolpaths.push({ toolNumber: this.readUint16(), points: this.readPathPoints() });
+                }
+                return toolpaths;
+            }
+
+            readPathPoints() {
+                const pointCount = this.readUint32();
+                const points = [];
+                for (let i = 0; i < pointCount; i++) {
+                    points.push({ 
+                        x: this.readFloat(), 
+                        y: this.readFloat(), 
+                        z: this.readFloat(), 
+                        feedRate: this.readFloat(),
+                        a: 0 // Assuming A-axis isn't in MCAM, added for compatibility
+                    });
+                }
+                return points;
+            }
+
+            readUint32() { const v = this.dataView.getUint32(this.offset, this.littleEndian); this.offset += 4; return v; }
+            readUint16() { const v = this.dataView.getUint16(this.offset, this.littleEndian); this.offset += 2; return v; }
+            readFloat() { const v = this.dataView.getFloat32(this.offset, this.littleEndian); this.offset += 4; return v; }
+            readByte() { const v = this.dataView.getUint8(this.offset); this.offset += 1; return v; }
+            readUint64() { const l = this.readUint32(); const r = this.readUint32(); return l + 2 ** 32 * r; }
+            readString(length) {
+                let result = '';
+                for (let i = 0; i < length; i++) {
+                    const char = this.readByte();
+                    if (char !== 0) result += String.fromCharCode(char);
+                }
+                return result;
+            }
+        }
+
         // G-code Parser (Simplified for 4-axis)
         class GcodeParser {
             constructor(text) {
@@ -257,12 +349,10 @@
             }
 
             init() {
-                // 2D Canvas
                 this.resizeCanvas();
                 this.ctx2D.strokeStyle = '#0000ff';
                 this.ctx2D.lineWidth = 1;
 
-                // 3D Scene
                 this.renderer3D.setSize(this.canvas2D.width, this.canvas2D.height);
                 this.camera3D.position.set(0, 0, 50);
                 this.controls.enableDamping = true;
@@ -427,6 +517,16 @@
             }
         }
 
+        // File Format Detection
+        function detectFileFormat(buffer) {
+            if (buffer.byteLength < 4) return 'UNKNOWN';
+            const header = new Uint8Array(buffer.slice(0, 4));
+            const headerStr = String.fromCharCode(...header);
+            if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
+            if (headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
+            return 'UNKNOWN';
+        }
+
         // Main Application
         document.addEventListener('DOMContentLoaded', () => {
             const viewer = new CNCViewer();
@@ -442,7 +542,7 @@
                 document.getElementById('file-name').textContent = file ? file.name : 'None';
                 document.getElementById('file-size').textContent = file ? `${(file.size / 1024).toFixed(2)} KB` : '0 KB';
                 document.getElementById('toolpath-count').textContent = data.toolpaths.length;
-                document.getElementById('units').textContent = data.units;
+                document.getElementById('units').textContent = data.units || data.header?.units || 'N/A';
 
                 let minX = Infinity, minY = Infinity, minZ = Infinity;
                 let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -462,18 +562,37 @@
             function loadFile(file) {
                 loadingOverlay.style.display = 'flex';
                 const reader = new FileReader();
+
                 reader.onload = () => {
-                    const text = reader.result;
-                    gcodeInput.value = text;
-                    const parser = new GcodeParser(text);
-                    const data = parser.parse();
-                    if (data.success) {
-                        viewer.loadToolpaths(data.toolpaths);
-                        updateInfo(file, data);
+                    const buffer = reader.result;
+                    const format = detectFileFormat(buffer);
+
+                    if (format === 'MCAM') {
+                        const parser = new McamParser(buffer);
+                        const data = parser.parse();
+                        if (data.success) {
+                            viewer.loadToolpaths(data.toolpaths);
+                            updateInfo(file, data);
+                            gcodeInput.value = 'Binary MCAM file - toolpaths only (not editable)';
+                        } else {
+                            alert(`MCAM parsing failed: ${data.error}`);
+                        }
+                    } else if (format === 'GCODE') {
+                        const text = new TextDecoder().decode(buffer);
+                        gcodeInput.value = text;
+                        const parser = new GcodeParser(text);
+                        const data = parser.parse();
+                        if (data.success) {
+                            viewer.loadToolpaths(data.toolpaths);
+                            updateInfo(file, data);
+                        }
+                    } else {
+                        alert('Unsupported file format');
                     }
                     loadingOverlay.style.display = 'none';
                 };
-                reader.readAsText(file);
+
+                reader.readAsArrayBuffer(file); // Use ArrayBuffer for MCAM binary
             }
 
             fileInput.addEventListener('change', (e) => {
@@ -508,11 +627,11 @@
             resetViewBtn.addEventListener('click', () => viewer.resetView());
 
             toggleMaterialBtn.addEventListener('click', () => {
-                viewer.toggleMaterial();
+                viewer W.toggleMaterial();
                 toggleMaterialBtn.classList.toggle('active');
             });
 
-            // Load sample G-code
+            // Load sample G-code by default
             const sampleGcode = `G21\nT1\nG0 X0 Y0 Z10 A0\nG1 X10 Y10 Z5 A90 F100\nG1 X20 Y20 Z0 A180\nG0 X0 Y0 Z10 A0`;
             gcodeInput.value = sampleGcode;
             const parser = new GcodeParser(sampleGcode);
