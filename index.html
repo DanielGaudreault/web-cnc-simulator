@@ -21,20 +21,26 @@
             display: flex;
         }
 
-        #file-input {
+        #upload-button {
             position: absolute;
             top: 10px;
             left: 10px;
             z-index: 100;
             padding: 8px 16px;
-            background: #fff;
-            border: 1px solid #4a90e2;
+            background: #4a90e2;
+            color: white;
+            border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 12px;
         }
 
-        #file-input:hover {
-            background: #f0f0f0;
+        #upload-button:hover {
+            background: #357ab8;
+        }
+
+        #file-input {
+            display: none; /* Hidden, triggered by button */
         }
 
         .toolbar {
@@ -158,11 +164,12 @@
 </head>
 <body>
     <div id="viewer-container">
-        <input type="file" id="file-input" accept=".gcode,.mcam" />
+        <button id="upload-button">Upload File</button>
+        <input type="file" id="file-input" accept=".gcode,.mcam,.nc,.tap" />
 
         <div id="sidebar">
             <h3>G-Code Editor</h3>
-            <textarea id="gcode-input" placeholder="Paste or edit G-code here..."></textarea>
+            <textarea id="gcode-input" placeholder="Paste or edit G-code here (MCAM shows binary info)..."></textarea>
             <div id="info-panel">
                 <h3>File Info</h3>
                 <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
@@ -195,6 +202,98 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
 
     <script>
+        // MCAM Parser
+        class McamParser {
+            constructor(buffer) {
+                this.buffer = buffer;
+                this.dataView = new DataView(buffer);
+                this.offset = 0;
+                this.littleEndian = true;
+                this.supportedVersions = [1, 2, 3];
+            }
+
+            parse() {
+                try {
+                    this.checkFileSize();
+                    const header = this.parseHeader();
+                    if (!this.supportedVersions.includes(header.version)) throw new Error(`Unsupported MCAM version ${header.version}`);
+                    const geometry = this.parseGeometry(header.version);
+                    const toolpaths = this.parseToolpaths(header.version);
+                    return { success: true, header, geometry, toolpaths };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            checkFileSize() { if (this.buffer.byteLength < 16) throw new Error('File too small'); }
+            parseHeader() {
+                const magic = this.readString(4);
+                if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
+                const version = this.readUint32();
+                const fileSize = this.readUint32();
+                if (fileSize > this.buffer.byteLength) throw new Error('File size mismatch');
+                return { version, fileSize, creationDate: this.readUint64(), units: this.readByte() === 0 ? 'mm' : 'inch' };
+            }
+
+            parseGeometry(version) {
+                const vertexCount = this.readUint32();
+                if (vertexCount > 1000000) throw new Error('Excessive vertex count');
+                const vertices = new Float32Array(vertexCount * 3);
+                for (let i = 0; i < vertexCount; i++) {
+                    vertices[i * 3] = this.readFloat();
+                    vertices[i * 3 + 1] = this.readFloat();
+                    vertices[i * 3 + 2] = this.readFloat();
+                }
+                const faceCount = this.readUint32();
+                if (faceCount > 2000000) throw new Error('Excessive face count');
+                const faces = new Uint32Array(faceCount * 3);
+                for (let i = 0; i < faceCount; i++) {
+                    faces[i * 3] = this.readUint32();
+                    faces[i * 3 + 1] = this.readUint32();
+                    faces[i * 3 + 2] = this.readUint32();
+                }
+                return { vertices, faces };
+            }
+
+            parseToolpaths(version) {
+                const pathCount = this.readUint16();
+                const toolpaths = [];
+                for (let i = 0; i < pathCount; i++) {
+                    toolpaths.push({ toolNumber: this.readUint16(), points: this.readPathPoints() });
+                }
+                return toolpaths;
+            }
+
+            readPathPoints() {
+                const pointCount = this.readUint32();
+                const points = [];
+                for (let i = 0; i < pointCount; i++) {
+                    points.push({ 
+                        x: this.readFloat(), 
+                        y: this.readFloat(), 
+                        z: this.readFloat(), 
+                        feedRate: this.readFloat(),
+                        a: 0 // Assuming A-axis isn't in MCAM, adjust if needed
+                    });
+                }
+                return points;
+            }
+
+            readUint32() { const v = this.dataView.getUint32(this.offset, this.littleEndian); this.offset += 4; return v; }
+            readUint16() { const v = this.dataView.getUint16(this.offset, this.littleEndian); this.offset += 2; return v; }
+            readFloat() { const v = this.dataView.getFloat32(this.offset, this.littleEndian); this.offset += 4; return v; }
+            readByte() { const v = this.dataView.getUint8(this.offset); this.offset += 1; return v; }
+            readUint64() { const l = this.readUint32(); const r = this.readUint32(); return l + 2 ** 32 * r; }
+            readString(length) {
+                let result = '';
+                for (let i = 0; i < length; i++) {
+                    const char = this.readByte();
+                    if (char !== 0) result += String.fromCharCode(char);
+                }
+                return result;
+            }
+        }
+
         // G-code Parser for Haas and Okuma Genos
         class GcodeParser {
             constructor(text) {
@@ -253,8 +352,6 @@
                 this.showMaterial = true;
                 this.materialMesh = null;
                 this.animating = false;
-                this.grid2D = null;
-                this.grid3D = null;
                 this.init();
             }
 
@@ -273,10 +370,9 @@
                 light.position.set(1, 1, 1);
                 this.scene.add(light);
 
-                // Add 3D Grid
-                this.grid3D = new THREE.GridHelper(100, 100, 0x888888, 0x888888);
-                this.grid3D.position.set(0, 0, -0.1); // Slightly below to avoid z-fighting
-                this.scene.add(this.grid3D);
+                const grid = new THREE.GridHelper(100, 100, 0x888888, 0x888888);
+                grid.position.set(0, 0, -0.1);
+                this.scene.add(grid);
 
                 this.animate();
                 window.addEventListener('resize', () => this.resizeCanvas());
@@ -304,7 +400,6 @@
                 const offsetX = this.canvas2D.width / 2;
                 const offsetY = this.canvas2D.height / 2;
 
-                // Draw 2D Grid
                 this.ctx2D.strokeStyle = '#888888';
                 this.ctx2D.lineWidth = 0.5;
                 for (let i = -50; i <= 50; i += 5) {
@@ -318,7 +413,6 @@
                     this.ctx2D.stroke();
                 }
 
-                // Draw Toolpaths
                 this.ctx2D.strokeStyle = '#0000ff';
                 this.ctx2D.lineWidth = 1;
                 this.toolpaths.forEach(tp => {
@@ -338,7 +432,7 @@
                 this.toolpaths.forEach(tp => {
                     const points = tp.points.map(p => {
                         const vec = new THREE.Vector3(p.x, p.y, p.z);
-                        vec.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(p.a || 0)); // 4-axis A rotation
+                        vec.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(p.a || 0));
                         return vec;
                     });
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -460,9 +554,21 @@
             }
         }
 
+        // File Format Detection
+        function detectFileFormat(buffer, fileName) {
+            const header = new Uint8Array(buffer.slice(0, 4));
+            const headerStr = String.fromCharCode(...header);
+            const ext = fileName.split('.').pop().toLowerCase();
+
+            if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
+            if (ext === 'gcode' || ext === 'nc' || ext === 'tap' || headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
+            return 'UNKNOWN';
+        }
+
         // Main Application
         document.addEventListener('DOMContentLoaded', () => {
             const viewer = new CNCViewer();
+            const uploadButton = document.getElementById('upload-button');
             const fileInput = document.getElementById('file-input');
             const gcodeInput = document.getElementById('gcode-input');
             const viewToggleBtn = document.getElementById('view-toggle');
@@ -475,7 +581,7 @@
                 document.getElementById('file-name').textContent = file ? file.name : 'None';
                 document.getElementById('file-size').textContent = file ? `${(file.size / 1024).toFixed(2)} KB` : '0 KB';
                 document.getElementById('toolpath-count').textContent = data.toolpaths.length;
-                document.getElementById('units').textContent = data.units;
+                document.getElementById('units').textContent = data.units || data.header?.units || 'N/A';
 
                 let minX = Infinity, minY = Infinity, minZ = Infinity;
                 let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -495,19 +601,44 @@
             function loadFile(file) {
                 loadingOverlay.style.display = 'flex';
                 const reader = new FileReader();
+
                 reader.onload = () => {
-                    const text = reader.result;
-                    gcodeInput.value = text;
-                    const parser = new GcodeParser(text);
-                    const data = parser.parse();
-                    if (data.success) {
-                        viewer.loadToolpaths(data.toolpaths);
-                        updateInfo(file, data);
+                    const buffer = reader.result;
+                    const format = detectFileFormat(buffer, file.name);
+
+                    if (format === 'MCAM') {
+                        const parser = new McamParser(buffer);
+                        const data = parser.parse();
+                        if (data.success) {
+                            viewer.loadToolpaths(data.toolpaths);
+                            updateInfo(file, data);
+                            gcodeInput.value = 'Binary MCAM file - toolpaths only (not editable)';
+                        } else {
+                            alert(`MCAM parsing failed: ${data.error}`);
+                        }
+                    } else if (format === 'GCODE') {
+                        const text = new TextDecoder().decode(buffer);
+                        gcodeInput.value = text;
+                        const parser = new GcodeParser(text);
+                        const data = parser.parse();
+                        if (data.success) {
+                            viewer.loadToolpaths(data.toolpaths);
+                            updateInfo(file, data);
+                        } else {
+                            alert('G-code parsing failed');
+                        }
+                    } else {
+                        alert(`Unsupported file format: ${format}`);
                     }
                     loadingOverlay.style.display = 'none';
                 };
-                reader.readAsText(file);
+
+                reader.readAsArrayBuffer(file); // Use ArrayBuffer for flexibility
             }
+
+            uploadButton.addEventListener('click', () => {
+                fileInput.click(); // Trigger hidden file input
+            });
 
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
