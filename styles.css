@@ -14,113 +14,11 @@ body {
     flex: 1;
     display: flex;
     width: 100%;
-    height: calc(100% - 40px);
+    height: 100%;
     position: relative;
-    top: 40px;
 }
 
-.ribbon {
-    height: 40px;
-    background: #fff;
-    border-bottom: 1px solid #ddd;
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-}
-
-.toolset {
-    display: flex;
-    align-items: center;
-}
-
-.tb-group {
-    display: flex;
-    align-items: center;
-}
-
-.tool {
-    padding: 6px 10px;
-    cursor: pointer;
-    color: #4a90e2;
-    transition: color 0.2s, background 0.2s;
-    display: flex;
-    align-items: center;
-}
-
-.tool:hover {
-    color: #357ab8;
-    background: #f0f0f0;
-    border-radius: 4px;
-}
-
-.tool.disabled {
-    color: #aaa;
-    cursor: not-allowed;
-}
-
-.tool svg {
-    width: 16px;
-    height: 16px;
-}
-
-.divider {
-    width: 1px;
-    height: 24px;
-    background: #ddd;
-    margin: 0 5px;
-}
-
-.toolset.fill {
-    flex-grow: 1;
-}
-
-.toolpath-logo {
-    width: 16px;
-    height: 16px;
-    background: #4a90e2;
-    border-radius: 50%;
-}
-
-.tool[data-tooltip]:hover:after {
-    content: attr(data-tooltip);
-    position: absolute;
-    background: #333;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    z-index: 1000;
-    white-space: nowrap;
-}
-
-.pro-right:hover:after {
-    top: 50%;
-    left: 100%;
-    transform: translateY(-50%);
-    margin-left: 5px;
-}
-
-.pro-down:hover:after {
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 5px;
-}
-
-.pro-left:hover:after {
-    top: 50%;
-    right: 100%;
-    transform: translateY(-50%);
-    margin-right: 5px;
-}
-
-#file-input, #open-file {
+#file-input {
     display: none;
 }
 
@@ -355,13 +253,22 @@ body {
     border: 1px solid #ddd;
 }
 
-.control-icons {
-    display: flex;
-    gap: 5px;
+#control-bar {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
     background: #fff;
     padding: 5px;
     border-radius: 4px;
-    justify-content: flex-end;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.control-icons {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
 }
 
 .icon {
@@ -380,16 +287,20 @@ body {
     height: 16px;
 }
 
-.icon.active svg {
+.icon.active {
     color: #357ab8;
 }
 
 .dropdown-buttons {
+    display: flex;
+    gap: 5px;
+    background: #fff;
+    padding: 5px;
+    border-radius: 4px;
+    justify-content: flex-end;
     position: absolute;
     bottom: 15px;
     right: 15px;
-    display: flex;
-    gap: 5px;
 }
 
 .nc-btn {
