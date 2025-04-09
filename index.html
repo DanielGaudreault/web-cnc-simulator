@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEB CNC SIMULATOR</title>
+    <title>Ultimate MCAM Viewer with Material Cutting</title>
     <style>
         body {
             margin: 0;
@@ -21,7 +21,7 @@
             background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
         }
 
-        #file-input, #load-sample {
+        #file-input {
             position: absolute;
             top: 20px;
             left: 20px;
@@ -38,11 +38,7 @@
             transition: all 0.3s ease;
         }
 
-        #load-sample {
-            left: 150px;
-        }
-
-        #file-input:hover, #load-sample:hover {
+        #file-input:hover {
             background: rgba(255, 255, 255, 1);
             border-color: #357ab8;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -240,7 +236,6 @@
 <body>
     <div id="viewer-container">
         <input type="file" id="file-input" accept=".mcam,.mcx,.gcode" />
-        <button id="load-sample">Load Sample MCAM</button>
 
         <div id="loading-overlay" class="loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
@@ -299,7 +294,6 @@
         function createSampleMcam() {
             const buffer = new ArrayBuffer(256);
             const view = new DataView(buffer);
-            // Header: "MCAM", version 1, size 256, creation date, units (mm)
             view.setUint8(0, 'M'.charCodeAt(0));
             view.setUint8(1, 'C'.charCodeAt(0));
             view.setUint8(2, 'A'.charCodeAt(0));
@@ -309,7 +303,6 @@
             view.setUint32(12, 0, true);
             view.setUint32(16, 0, true);
             view.setUint8(20, 0);
-            // Geometry: 8 vertices (cube), 12 faces
             view.setUint32(21, 8, true);
             let offset = 25;
             const cubeVertices = [
@@ -328,7 +321,6 @@
                 3, 2, 6,  3, 6, 7,  4, 5, 1,  4, 1, 0
             ];
             cubeFaces.forEach(f => { view.setUint32(offset, f, true); offset += 4; });
-            // Toolpath: 1 path, 5 points (cutting a groove)
             view.setUint16(offset, 1, true); offset += 2;
             view.setUint16(offset, 1, true); offset += 2;
             view.setUint32(offset, 5, true); offset += 4;
@@ -505,7 +497,7 @@
             }
         }
 
-        // 3D Viewer with Material Cutting
+        // 3D Viewer with Dynamic Grid
         class ThreeDViewer {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
@@ -523,6 +515,7 @@
                 this.toolpathBaseColor = 0xff0000;
                 this.animating = false;
                 this.materialMesh = null;
+                this.gridHelper = null;
                 this.init();
             }
 
@@ -537,7 +530,8 @@
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
                 directionalLight.position.set(1, 1, 1);
                 this.scene.add(directionalLight);
-                this.scene.add(new THREE.GridHelper(100, 100));
+                this.gridHelper = new THREE.GridHelper(100, 10);
+                this.scene.add(this.gridHelper);
                 this.scene.add(new THREE.AxesHelper(10));
                 this.animate();
                 window.addEventListener('resize', () => this.onWindowResize());
@@ -557,6 +551,19 @@
                 this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
             }
 
+            updateGrid(bounds) {
+                this.scene.remove(this.gridHelper);
+                const size = Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) * 1.5;
+                const divisions = Math.ceil(size / 10) * 10;
+                this.gridHelper = new THREE.GridHelper(size, divisions);
+                this.gridHelper.position.set(
+                    (bounds.max.x + bounds.min.x) / 2,
+                    (bounds.max.y + bounds.min.y) / 2,
+                    bounds.min.z - 0.1 // Slightly below the object
+                );
+                this.scene.add(this.gridHelper);
+            }
+
             loadGeometry(geometryData) {
                 this.clearSceneExceptHelpers();
                 const geometry = new THREE.BufferGeometry();
@@ -573,11 +580,12 @@
                 const mesh = new THREE.Mesh(geometry, material);
                 this.scene.add(mesh);
                 this.loadMaterial(geometryData);
+                const bounds = this.getBounds(geometryData.vertices);
+                this.updateGrid(bounds);
                 this.zoomToObject(mesh);
             }
 
             loadMaterial(geometryData) {
-                // Create a stock material block based on geometry bounds
                 const positions = geometryData.vertices;
                 let minX = Infinity, minY = Infinity, minZ = Infinity;
                 let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -589,7 +597,7 @@
                     maxY = Math.max(maxY, positions[i + 1]);
                     maxZ = Math.max(maxZ, positions[i + 2]);
                 }
-                const width = maxX - minX + 10; // Add padding
+                const width = maxX - minX + 10;
                 const height = maxY - minY + 10;
                 const depth = maxZ - minZ + 10;
                 const materialGeometry = new THREE.BoxGeometry(width, height, depth);
@@ -620,6 +628,38 @@
                     line.userData = { isToolpath: true, toolNumber: toolpath.toolNumber, points: toolpath.points };
                     this.scene.add(line);
                 });
+                const bounds = this.getToolpathBounds(toolpaths);
+                this.updateGrid(bounds);
+            }
+
+            getBounds(vertices) {
+                let minX = Infinity, minY = Infinity, minZ = Infinity;
+                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                for (let i = 0; i < vertices.length; i += 3) {
+                    minX = Math.min(minX, vertices[i]);
+                    minY = Math.min(minY, vertices[i + 1]);
+                    minZ = Math.min(minZ, vertices[i + 2]);
+                    maxX = Math.max(maxX, vertices[i]);
+                    maxY = Math.max(maxY, vertices[i + 1]);
+                    maxZ = Math.max(maxZ, vertices[i + 2]);
+                }
+                return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
+            }
+
+            getToolpathBounds(toolpaths) {
+                let minX = Infinity, minY = Infinity, minZ = Infinity;
+                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                toolpaths.forEach(tp => {
+                    tp.points.forEach(p => {
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        minZ = Math.min(minZ, p.z);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                        maxZ = Math.max(maxZ, p.z);
+                    });
+                });
+                return { min: { x: minX, y: minY, z: minZ }, max: { x: maxX, y: maxY, z: maxZ } };
             }
 
             getToolColor(index) {
@@ -711,17 +751,15 @@
                 tool.userData.isToolpath = true;
                 this.scene.add(tool);
 
-                // Simulate cutting by creating a small subtraction volume
                 if (this.materialMesh) {
                     const cutGeometry = new THREE.BoxGeometry(1, 1, 1);
                     const cutMesh = new THREE.Mesh(cutGeometry, new THREE.MeshBasicMaterial({ visible: false }));
                     cutMesh.position.set(point.x, point.y, point.z);
                     this.scene.add(cutMesh);
-                    // Note: True CSG subtraction requires an external library like three-csg; here we just visualize
                 }
 
                 this.animationData.currentPoint += this.animationData.speed;
-                setTimeout(() => this.scene.remove(tool), 100); // Remove tool after brief delay
+                setTimeout(() => this.scene.remove(tool), 100);
             }
 
             exportSTL() {
@@ -758,10 +796,9 @@
         }
 
         // Main Application
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const viewer = new ThreeDViewer('viewer-container');
             const fileInput = document.getElementById('file-input');
-            const loadSampleBtn = document.getElementById('load-sample');
             const viewToggleBtn = document.getElementById('view-toggle');
             const resetViewBtn = document.getElementById('reset-view');
             const editToggleBtn = document.getElementById('edit-toggle');
@@ -789,6 +826,11 @@
             let currentData = null;
             let history = [];
             let historyIndex = -1;
+
+            // Load sample by default
+            const sampleBuffer = createSampleMcam();
+            const sampleFile = new File([sampleBuffer], 'sample.mcam', { type: 'application/octet-stream' });
+            await processFile(sampleFile, sampleBuffer);
 
             function showLoading(message, progress = 0) {
                 document.getElementById('loading-text').textContent = message;
@@ -924,11 +966,11 @@
                     addToHistory(result);
                     updateFileInfo(file, format, result);
                     if (result.geometry) viewer.loadGeometry(result.geometry);
-                    if (result.toolpaths) viewer.renderToolpaths(result.toolpaths);
-                    fileContent.value = result.rawText || "Binary data (not editable directly)";
+                    if (result.toolpaths && !result.geometry) viewer.renderToolpaths(result.toolpaths);
                 } else {
                     throw new Error(result.error);
                 }
+                hideLoading();
             }
 
             fileInput.addEventListener('change', async (event) => {
@@ -940,19 +982,6 @@
                 } catch (error) {
                     showError(error.message);
                     updateFileInfo(file, 'Error', null);
-                } finally {
-                    hideLoading();
-                }
-            });
-
-            loadSampleBtn.addEventListener('click', async () => {
-                const sampleBuffer = createSampleMcam();
-                const file = new File([sampleBuffer], 'sample.mcam', { type: 'application/octet-stream' });
-                try {
-                    await processFile(file, sampleBuffer);
-                } catch (error) {
-                    showError(error.message);
-                } finally {
                     hideLoading();
                 }
             });
