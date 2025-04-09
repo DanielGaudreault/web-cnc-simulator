@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate CNC Viewer</title>
+    <title>Ultimate CNC Viewer (4-Axis)</title>
     <style>
         body {
             margin: 0;
@@ -18,44 +18,36 @@
             width: 100vw;
             height: 100vh;
             position: relative;
-            background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
+            display: flex;
         }
 
         #file-input {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 10px;
+            left: 10px;
             z-index: 100;
-            padding: 12px 20px;
-            background: rgba(255, 255, 255, 0.95);
-            border: 2px solid #4a90e2;
-            border-radius: 6px;
-            color: #333;
-            font-size: 14px;
-            font-weight: 500;
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #4a90e2;
+            border-radius: 4px;
             cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
         }
 
         #file-input:hover {
-            background: rgba(255, 255, 255, 1);
-            border-color: #357ab8;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            background: #f0f0f0;
         }
 
         .toolbar {
             position: absolute;
-            top: 20px;
-            right: 20px;
+            top: 10px;
+            right: 10px;
             z-index: 100;
             display: flex;
-            flex-wrap: wrap;
             gap: 8px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 10px;
-            border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            background: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .tool-button {
@@ -63,11 +55,9 @@
             color: white;
             border: none;
             border-radius: 4px;
-            padding: 8px 12px;
+            padding: 6px 12px;
             cursor: pointer;
-            font-size: 13px;
-            transition: all 0.2s ease;
-            position: relative;
+            font-size: 12px;
         }
 
         .tool-button:hover {
@@ -78,98 +68,63 @@
             background: #357ab8;
         }
 
-        .tool-button::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 5px;
-            border-radius: 3px;
-            font-size: 12px;
-            display: none;
-            white-space: nowrap;
-        }
-
-        .tool-button:hover::after {
-            display: block;
-        }
-
-        .info-panel, .editor-panel {
-            position: absolute;
+        #sidebar {
+            width: 300px;
+            height: 100%;
+            background: #fff;
+            padding: 10px;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
             z-index: 100;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            max-width: 350px;
         }
 
-        .info-panel {
-            bottom: 20px;
-            left: 20px;
-        }
-
-        .editor-panel {
-            bottom: 20px;
-            right: 20px;
-            max-width: 450px;
-            display: none;
-        }
-
-        .info-panel h3, .editor-panel h3 {
-            margin-top: 0;
+        #sidebar h3 {
+            margin: 0 0 10px;
             color: #4a90e2;
-            font-size: 16px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 8px;
-        }
-
-        .info-item {
-            margin-bottom: 8px;
             font-size: 14px;
         }
 
-        .info-label {
-            font-weight: 600;
-            color: #555;
-            display: inline-block;
-            width: 150px;
-        }
-
-        .editor-panel textarea {
+        #gcode-input {
             width: 100%;
-            height: 150px;
-            resize: vertical;
+            height: 50%;
+            resize: none;
             font-family: monospace;
             font-size: 12px;
-            padding: 5px;
             border: 1px solid #ddd;
             border-radius: 4px;
-        }
-
-        .editor-panel input[type="number"], .editor-panel input[type="color"], .editor-panel select {
-            width: 80px;
             padding: 5px;
-            margin: 5px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
         }
 
-        .editor-panel button {
-            background: #4a90e2;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
+        #info-panel {
+            margin-top: 20px;
         }
 
-        .editor-panel button:hover {
-            background: #357ab8;
+        .info-item {
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 100px;
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        #canvas-2d, #canvas-3d {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #canvas-2d {
+            display: none;
         }
 
         .loading-overlay {
@@ -180,1058 +135,390 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             z-index: 200;
-            display: flex;
+            display: none;
             justify-content: center;
             align-items: center;
-            flex-direction: column;
             color: white;
         }
 
         .loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
             border-top: 4px solid #4a90e2;
-            width: 40px;
-            height: 40px;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
             animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-
-        .progress-bar {
-            width: 200px;
-            height: 10px;
-            background: #ddd;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: #4a90e2;
-            width: 0%;
-            transition: width 0.3s ease;
         }
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        .error-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.8);
-            color: white;
-            padding: 20px;
-            border-radius: 5px;
-            z-index: 300;
-            max-width: 80%;
-            text-align: center;
-            display: none;
-        }
     </style>
 </head>
 <body>
     <div id="viewer-container">
-        <input type="file" id="file-input" accept=".mcam,.mcx,.gcode" />
+        <input type="file" id="file-input" accept=".gcode,.mcx" />
 
-        <div id="loading-overlay" class="loading-overlay" style="display: none;">
-            <div class="loading-spinner"></div>
-            <div id="loading-text">Processing File...</div>
-            <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <div id="sidebar">
+            <h3>G-Code Editor</h3>
+            <textarea id="gcode-input" placeholder="Paste or edit G-code here..."></textarea>
+            <div id="info-panel">
+                <h3>File Info</h3>
+                <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
+                <div class="info-item"><span class="info-label">File Size:</span><span id="file-size">0 KB</span></div>
+                <div class="info-item"><span class="info-label">Toolpaths:</span><span id="toolpath-count">0</span></div>
+                <div class="info-item"><span class="info-label">Bounds:</span><span id="bounds">N/A</span></div>
+                <div class="info-item"><span class="info-label">Units:</span><span id="units">N/A</span></div>
+            </div>
         </div>
 
-        <div id="error-message" class="error-message"></div>
+        <div id="canvas-container">
+            <canvas id="canvas-2d"></canvas>
+            <canvas id="canvas-3d"></canvas>
+        </div>
 
         <div class="toolbar">
-            <button class="tool-button" id="view-toggle" data-tooltip="Toggle wireframe view">Wireframe</button>
-            <button class="tool-button" id="reset-view" data-tooltip="Reset camera position">Reset View</button>
-            <button class="tool-button" id="edit-toggle" data-tooltip="Open/close editor">Edit</button>
-            <button class="tool-button" id="measure-tool" data-tooltip="Measure distances">Measure</button>
-            <button class="tool-button" id="animate-tool" data-tooltip="Simulate cutting">Simulate</button>
-            <button class="tool-button" id="toggle-material" data-tooltip="Show/hide material">Material</button>
-            <button class="tool-button" id="export-stl" data-tooltip="Export as STL">STL</button>
-            <button class="tool-button" id="export-png" data-tooltip="Take screenshot">PNG</button>
-            <button class="tool-button" id="undo" data-tooltip="Undo last change">Undo</button>
-            <button class="tool-button" id="redo" data-tooltip="Redo last change">Redo</button>
-            <button class="tool-button" id="collision-check" data-tooltip="Check for collisions">Collision</button>
-            <button class="tool-button" id="machine-sim" data-tooltip="Toggle machine simulation">Machine</button>
+            <button class="tool-button" id="view-toggle" data-tooltip="Toggle 2D/3D">2D/3D</button>
+            <button class="tool-button" id="simulate" data-tooltip="Simulate Toolpath">Simulate</button>
+            <button class="tool-button" id="reset-view" data-tooltip="Reset View">Reset</button>
+            <button class="tool-button" id="toggle-material" data-tooltip="Show/Hide Material">Material</button>
         </div>
 
-        <div class="info-panel">
-            <h3>File Information</h3>
-            <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
-            <div class="info-item"><span class="info-label">File Size:</span><span id="file-size">0 MB</span></div>
-            <div class="info-item"><span class="info-label">File Type:</span><span id="file-type">Unknown</span></div>
-            <div class="info-item"><span class="info-label">Vertices:</span><span id="vertex-count">0</span></div>
-            <div class="info-item"><span class="info-label">Faces:</span><span id="face-count">0</span></div>
-            <div class="info-item"><span class="info-label">Toolpaths:</span><span id="toolpath-count">0</span></div>
-            <div class="info-item"><span class="info-label">Bounds:</span><span id="bounds">N/A</span></div>
-            <div class="info-item"><span class="info-label">Units:</span><span id="units">N/A</span></div>
-            <div class="info-item"><span class="info-label">Collisions:</span><span id="collision-status">N/A</span></div>
-        </div>
-
-        <div class="editor-panel" id="editor-panel">
-            <h3>Edit File</h3>
-            <textarea id="file-content" placeholder="File content will appear here..."></textarea>
-            <h3>Transform</h3>
-            <div>
-                <label>X Offset: <input type="number" id="x-offset" value="0" step="0.1"></label><br>
-                <label>Y Offset: <input type="number" id="y-offset" value="0" step="0.1"></label><br>
-                <label>Z Offset: <input type="number" id="z-offset" value="0" step="0.1"></label>
-            </div>
-            <h3>Colors</h3>
-            <div>
-                <label>Geometry: <input type="color" id="geometry-color" value="#2194ce"></label><br>
-                <label>Material: <input type="color" id="material-color" value="#aaaaaa"></label><br>
-                <label>Toolpath: <input type="color" id="toolpath-color" value="#ff0000"></label>
-            </div>
-            <h3>Simulation Settings</h3>
-            <div>
-                <label>Speed: <input type="number" id="sim-speed" value="0.05" step="0.01" min="0.01" max="1"></label><br>
-                <label>Machine: <select id="machine-type">
-                    <option value="3-axis">3-Axis Mill</option>
-                    <option value="5-axis">5-Axis Mill</option>
-                </select></label><br>
-                <label>Tool Dia (mm): <input type="number" id="tool-diameter" value="6" step="0.1" min="0.1"></label>
-            </div>
-            <button id="apply-changes">Apply Changes</button>
-            <button id="save-file">Save File</button>
+        <div id="loading-overlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <div>Loading...</div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/exporters/STLExporter.js"></script>
 
     <script>
-        // Sample MCAM File (Cube with Toolpath)
-        function createSampleMcam() {
-            const buffer = new ArrayBuffer(256);
-            const view = new DataView(buffer);
-            view.setUint8(0, 'M'.charCodeAt(0));
-            view.setUint8(1, 'C'.charCodeAt(0));
-            view.setUint8(2, 'A'.charCodeAt(0));
-            view.setUint8(3, 'M'.charCodeAt(0));
-            view.setUint32(4, 1, true);
-            view.setUint32(8, 256, true);
-            view.setUint32(12, 0, true);
-            view.setUint32(16, 0, true);
-            view.setUint8(20, 0);
-            view.setUint32(21, 8, true);
-            let offset = 25;
-            const cubeVertices = [
-                [0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0],
-                [0, 0, 10], [10, 0, 10], [10, 10, 10], [0, 10, 10]
-            ];
-            cubeVertices.forEach(v => {
-                view.setFloat32(offset, v[0], true); offset += 4;
-                view.setFloat32(offset, v[1], true); offset += 4;
-                view.setFloat32(offset, v[2], true); offset += 4;
-            });
-            view.setUint32(offset, 12, true); offset += 4;
-            const cubeFaces = [
-                0, 1, 2, 0, 2, 3, 1, 5, 6, 1, 6, 2,
-                5, 4, 7, 5, 7, 6, 4, 0, 3, 4, 3, 7,
-                3, 2, 6, 3, 6, 7, 4, 5, 1, 4, 1, 0
-            ];
-            cubeFaces.forEach(f => { view.setUint32(offset, f, true); offset += 4; });
-            view.setUint16(offset, 1, true); offset += 2;
-            view.setUint16(offset, 1, true); offset += 2;
-            view.setUint32(offset, 5, true); offset += 4;
-            const toolpathPoints = [
-                [2, 2, 10, 100], [2, 2, 5, 100], [8, 2, 5, 100], [8, 2, 10, 100], [2, 2, 10, 100]
-            ];
-            toolpathPoints.forEach(p => {
-                view.setFloat32(offset, p[0], true); offset += 4;
-                view.setFloat32(offset, p[1], true); offset += 4;
-                view.setFloat32(offset, p[2], true); offset += 4;
-                view.setFloat32(offset, p[3], true); offset += 4;
-            });
-            return buffer;
-        }
-
-        // MCAM Parser
-        class McamParser {
-            constructor(buffer) {
-                this.buffer = buffer;
-                this.dataView = new DataView(buffer);
-                this.offset = 0;
-                this.littleEndian = true;
-                this.supportedVersions = [1, 2, 3];
-            }
-
-            parse() {
-                try {
-                    this.checkFileSize();
-                    const header = this.parseHeader();
-                    if (!this.supportedVersions.includes(header.version)) throw new Error(`Unsupported MCAM version ${header.version}`);
-                    const geometry = this.parseGeometry(header.version);
-                    const toolpaths = this.parseToolpaths(header.version);
-                    return { success: true, header, geometry, toolpaths };
-                } catch (error) {
-                    return { success: false, error: error.message };
-                }
-            }
-
-            checkFileSize() { if (this.buffer.byteLength < 16) throw new Error('File too small'); }
-            parseHeader() {
-                const magic = this.readString(4);
-                if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
-                const version = this.readUint32();
-                const fileSize = this.readUint32();
-                if (fileSize > this.buffer.byteLength) throw new Error('File size mismatch');
-                return { version, fileSize, creationDate: this.readUint64(), units: this.readByte() === 0 ? 'mm' : 'inch' };
-            }
-
-            parseGeometry(version) {
-                const vertexCount = this.readUint32();
-                if (vertexCount > 1000000) throw new Error('Excessive vertex count');
-                const vertices = new Float32Array(vertexCount * 3);
-                for (let i = 0; i < vertexCount; i++) {
-                    vertices[i * 3] = this.readFloat();
-                    vertices[i * 3 + 1] = this.readFloat();
-                    vertices[i * 3 + 2] = this.readFloat();
-                }
-                const faceCount = this.readUint32();
-                if (faceCount > 2000000) throw new Error('Excessive face count');
-                const faces = new Uint32Array(faceCount * 3);
-                for (let i = 0; i < faceCount; i++) {
-                    faces[i * 3] = this.readUint32();
-                    faces[i * 3 + 1] = this.readUint32();
-                    faces[i * 3 + 2] = this.readUint32();
-                }
-                return { vertices, faces };
-            }
-
-            parseToolpaths(version) {
-                const pathCount = this.readUint16();
-                const toolpaths = [];
-                for (let i = 0; i < pathCount; i++) {
-                    toolpaths.push({ toolNumber: this.readUint16(), points: this.readPathPoints() });
-                }
-                return toolpaths;
-            }
-
-            readPathPoints() {
-                const pointCount = this.readUint32();
-                const points = [];
-                for (let i = 0; i < pointCount; i++) {
-                    points.push({ x: this.readFloat(), y: this.readFloat(), z: this.readFloat(), feedRate: this.readFloat() });
-                }
-                return points;
-            }
-
-            readUint32() { const v = this.dataView.getUint32(this.offset, this.littleEndian); this.offset += 4; return v; }
-            readUint16() { const v = this.dataView.getUint16(this.offset, this.littleEndian); this.offset += 2; return v; }
-            readFloat() { const v = this.dataView.getFloat32(this.offset, this.littleEndian); this.offset += 4; return v; }
-            readByte() { const v = this.dataView.getUint8(this.offset); this.offset += 1; return v; }
-            readUint64() { const l = this.readUint32(); const r = this.readUint32(); return l + 2 ** 32 * r; }
-            readString(length) {
-                let result = '';
-                for (let i = 0; i < length; i++) {
-                    const char = this.readByte();
-                    if (char !== 0) result += String.fromCharCode(char);
-                }
-                return result;
-            }
-        }
-
-        // MCX Parser
-        class McxParser {
-            constructor(buffer) { this.text = new TextDecoder().decode(buffer); }
-            parse() {
-                try {
-                    const lines = this.text.split('\n');
-                    const toolpaths = [];
-                    let currentTool = 0;
-                    let points = [];
-                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0, a: 0, b: 0 }; // Added A, B for multi-axis
-                    for (let line of lines) {
-                        line = line.trim();
-                        if (!line || line.startsWith(';') || line.startsWith('(')) continue;
-                        if (line.startsWith('T')) {
-                            if (points.length) toolpaths.push({ toolNumber: currentTool, points });
-                            points = [];
-                            currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
-                        } else if (line.match(/[XYZFAB]/)) { // Added A, B for multi-axis
-                            const coords = line.match(/[XYZFAB][-\d.]+/g) || [];
-                            const point = { ...lastPos };
-                            coords.forEach(c => {
-                                const value = parseFloat(c.substring(1));
-                                if (c[0] === 'X') point.x = value;
-                                if (c[0] === 'Y') point.y = value;
-                                if (c[0] === 'Z') point.z = value;
-                                if (c[0] === 'F') point.feedRate = value;
-                                if (c[0] === 'A') point.a = value; // Tilt
-                                if (c[0] === 'B') point.b = value; // Rotation
-                            });
-                            points.push(point);
-                            lastPos = { ...point };
-                        }
-                    }
-                    if (points.length) toolpaths.push({ toolNumber: currentTool, points });
-                    return { success: true, toolpaths, rawText: this.text, header: { units: this.detectUnits() } };
-                } catch (error) {
-                    return { success: false, error: `MCX parsing failed: ${error.message}` };
-                }
-            }
-
-            detectUnits() {
-                return this.text.includes('G21') ? 'mm' : 'inch';
-            }
-        }
-
-        // G-code Parser
+        // G-code Parser (Simplified for 4-axis)
         class GcodeParser {
-            constructor(buffer) { this.text = new TextDecoder().decode(buffer); }
+            constructor(text) {
+                this.text = text;
+            }
+
             parse() {
-                try {
-                    const lines = this.text.split('\n');
-                    const toolpaths = [];
-                    let currentTool = 0;
-                    let points = [];
-                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0, a: 0, b: 0 }; // Added A, B for multi-axis
-                    let units = 'mm';
-                    for (let line of lines) {
-                        line = line.trim();
-                        if (!line || line.startsWith(';') || line.startsWith('(')) continue;
-                        if (line.includes('G20')) units = 'inch';
-                        if (line.includes('G21')) units = 'mm';
-                        if (line.startsWith('T')) {
-                            if (points.length) toolpaths.push({ toolNumber: currentTool, points });
-                            points = [];
-                            currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
-                        } else if (line.match(/G[0-1]/)) {
-                            const coords = line.match(/[XYZFAB][-\d.]+/g) || [];
-                            const point = { ...lastPos };
-                            coords.forEach(c => {
-                                const value = parseFloat(c.substring(1));
-                                if (c[0] === 'X') point.x = value;
-                                if (c[0] === 'Y') point.y = value;
-                                if (c[0] === 'Z') point.z = value;
-                                if (c[0] === 'F') point.feedRate = value;
-                                if (c[0] === 'A') point.a = value;
-                                if (c[0] === 'B') point.b = value;
-                            });
-                            points.push(point);
-                            lastPos = { ...point };
-                        }
+                const lines = this.text.split('\n');
+                const toolpaths = [];
+                let currentTool = 0;
+                let points = [];
+                let lastPos = { x: 0, y: 0, z: 0, a: 0, feedRate: 0 };
+                let units = 'mm';
+
+                lines.forEach(line => {
+                    line = line.trim().toUpperCase();
+                    if (!line || line.startsWith(';') || line.startsWith('(')) return;
+                    if (line.includes('G20')) units = 'inch';
+                    if (line.includes('G21')) units = 'mm';
+                    if (line.startsWith('T')) {
+                        if (points.length) toolpaths.push({ toolNumber: currentTool, points });
+                        points = [];
+                        currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
+                    } else if (line.match(/G[0-1]/)) {
+                        const coords = line.match(/[XYZA][-\d.]+|F[\d.]+/g) || [];
+                        const point = { ...lastPos };
+                        coords.forEach(c => {
+                            const value = parseFloat(c.substring(1));
+                            if (c[0] === 'X') point.x = value;
+                            if (c[0] === 'Y') point.y = value;
+                            if (c[0] === 'Z') point.z = value;
+                            if (c[0] === 'A') point.a = value; // 4-axis rotation
+                            if (c[0] === 'F') point.feedRate = value;
+                        });
+                        points.push(point);
+                        lastPos = { ...point };
                     }
-                    if (points.length) toolpaths.push({ toolNumber: currentTool, points });
-                    return { success: true, toolpaths, rawText: this.text, header: { units } };
-                } catch (error) {
-                    return { success: false, error: `G-code parsing failed: ${error.message}` };
-                }
+                });
+
+                if (points.length) toolpaths.push({ toolNumber: currentTool, points });
+                return { success: true, toolpaths, units };
             }
         }
 
-        // 3D Viewer with Mastercam Enhancements
-        class ThreeDViewer {
-            constructor(containerId) {
-                this.container = document.getElementById(containerId);
+        // CNC Viewer Class
+        class CNCViewer {
+            constructor() {
+                this.canvas2D = document.getElementById('canvas-2d');
+                this.ctx2D = this.canvas2D.getContext('2d');
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(75, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
-                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-                this.raycaster = new THREE.Raycaster();
-                this.mouse = new THREE.Vector2();
-                this.wireframeMode = false;
-                this.measureMode = false;
-                this.measurePoints = [];
-                this.geometryColor = 0x2194ce;
-                this.materialColor = 0xaaaaaa;
-                this.toolpathBaseColor = 0xff0000;
-                this.animating = false;
-                this.materialMesh = null;
+                this.camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer3D = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas-3d'), antialias: true });
+                this.controls = new THREE.OrbitControls(this.camera3D, this.renderer3D.domElement);
+                this.toolpaths = [];
+                this.is2DView = false;
                 this.showMaterial = true;
-                this.simulationSpeed = 0.05;
-                this.toolDiameter = 6;
-                this.machineType = '3-axis';
-                this.machineVisible = false;
-                this.machineMesh = null;
-                this.stockBounds = { x: 100, y: 100, z: 50 };
+                this.materialMesh = null;
+                this.animating = false;
                 this.init();
             }
 
             init() {
-                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-                this.renderer.setClearColor(0xf0f0f0);
-                this.container.appendChild(this.renderer.domElement);
-                this.camera.position.z = 50;
+                // 2D Canvas
+                this.resizeCanvas();
+                this.ctx2D.strokeStyle = '#0000ff';
+                this.ctx2D.lineWidth = 1;
+
+                // 3D Scene
+                this.renderer3D.setSize(this.canvas2D.width, this.canvas2D.height);
+                this.camera3D.position.set(0, 0, 50);
                 this.controls.enableDamping = true;
-                this.controls.dampingFactor = 0.25;
                 this.scene.add(new THREE.AmbientLight(0x404040));
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(1, 1, 1);
-                this.scene.add(directionalLight);
+                const light = new THREE.DirectionalLight(0xffffff, 0.8);
+                light.position.set(1, 1, 1);
+                this.scene.add(light);
                 this.scene.add(new THREE.GridHelper(100, 100));
-                this.scene.add(new THREE.AxesHelper(10));
                 this.animate();
-                window.addEventListener('resize', () => this.onWindowResize());
-                this.container.addEventListener('click', (e) => this.onClick(e));
+                window.addEventListener('resize', () => this.resizeCanvas());
             }
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                if (this.animating) this.updateAnimation();
-                this.controls.update();
-                this.renderer.render(this.scene, this.camera);
+            resizeCanvas() {
+                const container = document.getElementById('canvas-container');
+                this.canvas2D.width = container.clientWidth;
+                this.canvas2D.height = container.clientHeight;
+                this.renderer3D.setSize(container.clientWidth, container.clientHeight);
+                this.camera3D.aspect = container.clientWidth / container.clientHeight;
+                this.camera3D.updateProjectionMatrix();
             }
 
-            onWindowResize() {
-                this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
-                this.camera.updateProjectionMatrix();
-                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+            loadToolpaths(toolpaths) {
+                this.toolpaths = toolpaths;
+                this.render2D();
+                this.render3D();
+                this.loadMaterial();
             }
 
-            loadGeometry(data) {
-                this.clearSceneExceptHelpers();
-                let zoomTarget = null;
-                if (data.geometry && data.geometry.vertices.length) {
-                    const geometry = new THREE.BufferGeometry();
-                    geometry.setAttribute('position', new THREE.BufferAttribute(data.geometry.vertices, 3));
-                    geometry.setIndex(new THREE.BufferAttribute(data.geometry.faces, 1));
-                    geometry.computeVertexNormals();
-                    const material = new THREE.MeshPhongMaterial({
-                        color: this.geometryColor,
-                        specular: 0x111111,
-                        shininess: 30,
-                        side: THREE.DoubleSide,
-                        wireframe: this.wireframeMode
+            render2D() {
+                this.ctx2D.clearRect(0, 0, this.canvas2D.width, this.canvas2D.height);
+                const scale = Math.min(this.canvas2D.width, this.canvas2D.height) / 100;
+                const offsetX = this.canvas2D.width / 2;
+                const offsetY = this.canvas2D.height / 2;
+
+                this.toolpaths.forEach(tp => {
+                    this.ctx2D.beginPath();
+                    tp.points.forEach((p, i) => {
+                        const x = p.x * scale + offsetX;
+                        const y = p.y * scale + offsetY;
+                        if (i === 0) this.ctx2D.moveTo(x, y);
+                        else this.ctx2D.lineTo(x, y);
                     });
-                    const mesh = new THREE.Mesh(geometry, material);
-                    this.scene.add(mesh);
-                    zoomTarget = mesh;
-                }
-                this.loadMaterial(data);
-                if (data.toolpaths && data.toolpaths.length) {
-                    this.renderToolpaths(data.toolpaths);
-                    if (!zoomTarget) {
-                        const tempGeometry = new THREE.BufferGeometry().setFromPoints(
-                            data.toolpaths.flatMap(tp => tp.points.map(p => new THREE.Vector3(p.x, p.y, p.z)))
-                        );
-                        zoomTarget = new THREE.Line(tempGeometry, new THREE.LineBasicMaterial());
-                    }
-                }
-                if (zoomTarget) this.zoomToObject(zoomTarget);
-                this.loadMachine();
-            }
-
-            loadMaterial(data) {
-                let minX = Infinity, minY = Infinity, minZ = Infinity;
-                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-
-                if (data.geometry && data.geometry.vertices.length) {
-                    const vertices = data.geometry.vertices;
-                    for (let i = 0; i < vertices.length; i += 3) {
-                        minX = Math.min(minX, vertices[i]);
-                        minY = Math.min(minY, vertices[i + 1]);
-                        minZ = Math.min(minZ, vertices[i + 2]);
-                        maxX = Math.max(maxX, vertices[i]);
-                        maxY = Math.max(maxY, vertices[i + 1]);
-                        maxZ = Math.max(maxZ, vertices[i + 2]);
-                    }
-                }
-
-                if (data.toolpaths && data.toolpaths.length) {
-                    data.toolpaths.forEach(tp => {
-                        tp.points.forEach(p => {
-                            minX = Math.min(minX, p.x);
-                            minY = Math.min(minY, p.y);
-                            minZ = Math.min(minZ, p.z);
-                            maxX = Math.max(maxX, p.x);
-                            maxY = Math.max(maxY, p.y);
-                            maxZ = Math.max(maxZ, p.z);
-                        });
-                    });
-                }
-
-                if (minX === Infinity) {
-                    minX = minY = minZ = -10;
-                    maxX = maxY = maxZ = 10;
-                }
-
-                const width = Math.max(maxX - minX + 10, this.stockBounds.x);
-                const height = Math.max(maxY - minY + 10, this.stockBounds.y);
-                const depth = Math.max(maxZ - minZ + 10, this.stockBounds.z);
-                const materialGeometry = new THREE.BoxGeometry(width, height, depth);
-                const materialMaterial = new THREE.MeshPhongMaterial({
-                    color: this.materialColor,
-                    transparent: true,
-                    opacity: 0.7,
-                    wireframe: false
+                    this.ctx2D.stroke();
                 });
-                this.materialMesh = new THREE.Mesh(materialGeometry, materialMaterial);
-                this.materialMesh.position.set(
-                    (minX + maxX) / 2,
-                    (minY + maxY) / 2,
-                    (minZ + maxZ) / 2
-                );
-                this.materialMesh.visible = this.showMaterial;
-                this.scene.add(this.materialMesh);
             }
 
-            loadMachine() {
-                if (this.machineMesh) this.scene.remove(this.machineMesh);
-                if (!this.machineVisible) return;
-
-                const machineGeometry = new THREE.Group();
-                const table = new THREE.Mesh(
-                    new THREE.BoxGeometry(150, 150, 10),
-                    new THREE.MeshPhongMaterial({ color: 0x666666 })
-                );
-                table.position.set(0, 0, -5);
-                machineGeometry.add(table);
-
-                const spindle = new THREE.Mesh(
-                    new THREE.CylinderGeometry(5, 5, 20, 32),
-                    new THREE.MeshPhongMaterial({ color: 0x888888 })
-                );
-                spindle.position.set(0, 0, 20);
-                spindle.rotation.x = Math.PI / 2;
-                machineGeometry.add(spindle);
-
-                this.machineMesh = machineGeometry;
-                this.scene.add(this.machineMesh);
-            }
-
-            renderToolpaths(toolpaths) {
-                this.scene.children.filter(obj => obj.userData.isToolpath).forEach(obj => this.scene.remove(obj));
-                toolpaths.forEach((toolpath, index) => {
-                    const points = toolpath.points.map(p => {
+            render3D() {
+                this.scene.children.filter(obj => obj.userData.isToolpath || obj === this.materialMesh).forEach(obj => this.scene.remove(obj));
+                this.toolpaths.forEach(tp => {
+                    const points = tp.points.map(p => {
                         const vec = new THREE.Vector3(p.x, p.y, p.z);
-                        if (this.machineType === '5-axis' && p.a !== undefined && p.b !== undefined) {
-                            vec.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(p.a));
-                            vec.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(p.b));
-                        }
+                        vec.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(p.a || 0)); // 4-axis A rotation
                         return vec;
                     });
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                    const material = new THREE.LineBasicMaterial({
-                        color: this.getToolColor(index),
-                        linewidth: 2
-                    });
+                    const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
                     const line = new THREE.Line(geometry, material);
-                    line.userData = { isToolpath: true, toolNumber: toolpath.toolNumber, points: toolpath.points };
+                    line.userData.isToolpath = true;
                     this.scene.add(line);
                 });
             }
 
-            getToolColor(index) {
-                const base = parseInt(this.toolpathBaseColor.toString(16), 16);
-                const variation = (index * 0x333333) % 0xffffff;
-                return base + variation;
-            }
+            loadMaterial() {
+                if (this.materialMesh) this.scene.remove(this.materialMesh);
+                if (!this.showMaterial || !this.toolpaths.length) return;
 
-            zoomToObject(object) {
-                const box = new THREE.Box3().setFromObject(object);
-                const size = box.getSize(new THREE.Vector3()).length();
-                const center = box.getCenter(new THREE.Vector3());
-                this.camera.position.copy(center);
-                this.camera.position.z += size * 1.5;
-                this.controls.target.copy(center);
-                this.controls.update();
-            }
-
-            clearSceneExceptHelpers() {
-                this.scene.children.forEach(child => {
-                    if (!(child instanceof THREE.GridHelper || child instanceof THREE.AxesHelper || child instanceof THREE.Light)) {
-                        this.scene.remove(child);
-                    }
+                let minX = Infinity, minY = Infinity, minZ = Infinity;
+                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                this.toolpaths.forEach(tp => {
+                    tp.points.forEach(p => {
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        minZ = Math.min(minZ, p.z);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                        maxZ = Math.max(maxZ, p.z);
+                    });
                 });
-                this.materialMesh = null;
-                this.machineMesh = null;
+
+                const width = Math.max(maxX - minX + 10, 50);
+                const height = Math.max(maxY - minY + 10, 50);
+                const depth = Math.max(maxZ - minZ + 10, 50);
+                const geometry = new THREE.BoxGeometry(width, height, depth);
+                const material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.7 });
+                this.materialMesh = new THREE.Mesh(geometry, material);
+                this.materialMesh.position.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+                this.scene.add(this.materialMesh);
             }
 
-            toggleWireframeMode() {
-                this.wireframeMode = !this.wireframeMode;
-                this.scene.traverse(child => {
-                    if (child.isMesh && child !== this.materialMesh && child !== this.machineMesh) child.material.wireframe = this.wireframeMode;
-                });
+            toggleView() {
+                this.is2DView = !this.is2DView;
+                this.canvas2D.style.display = this.is2DView ? 'block' : 'none';
+                this.canvas3D.style.display = this.is2DView ? 'none' : 'block';
+                if (this.is2DView) this.render2D();
             }
 
             toggleMaterial() {
                 this.showMaterial = !this.showMaterial;
                 if (this.materialMesh) this.materialMesh.visible = this.showMaterial;
-            }
-
-            toggleMachine() {
-                this.machineVisible = !this.machineVisible;
-                this.loadMachine();
+                if (this.showMaterial && !this.materialMesh) this.loadMaterial();
             }
 
             resetView() {
-                this.controls.reset();
-                this.camera.position.set(0, 0, 50);
-                this.controls.update();
-            }
-
-            onClick(event) {
-                if (!this.measureMode) return;
-                this.mouse.x = (event.clientX / this.container.clientWidth) * 2 - 1;
-                this.mouse.y = -(event.clientY / this.container.clientHeight) * 2 + 1;
-                this.raycaster.setFromCamera(this.mouse, this.camera);
-                const intersects = this.raycaster.intersectObjects(this.scene.children);
-                if (intersects.length) {
-                    const point = intersects[0].point;
-                    this.measurePoints.push(point);
-                    if (this.measurePoints.length === 2) {
-                        const distance = this.measurePoints[0].distanceTo(this.measurePoints[1]);
-                        alert(`Distance: ${distance.toFixed(2)} units`);
-                        this.measurePoints = [];
-                    }
+                if (this.is2DView) {
+                    this.render2D();
+                } else {
+                    this.camera3D.position.set(0, 0, 50);
+                    this.controls.target.set(0, 0, 0);
+                    this.controls.update();
                 }
             }
 
-            startAnimation(toolpaths) {
+            startSimulation() {
+                if (!this.toolpaths.length) return;
                 this.animating = true;
-                this.animationData = { toolpaths, currentPath: 0, currentPoint: 0, speed: this.simulationSpeed };
-                if (this.materialMesh) this.materialMesh.visible = true;
+                this.animationData = { currentPath: 0, currentPoint: 0, speed: 0.05 };
             }
 
-            stopAnimation() {
+            stopSimulation() {
                 this.animating = false;
-                if (this.materialMesh) this.materialMesh.visible = this.showMaterial;
             }
 
-            updateAnimation() {
-                const { toolpaths, currentPath, currentPoint } = this.animationData;
-                if (currentPath >= toolpaths.length) {
-                    this.stopAnimation();
+            updateSimulation() {
+                if (!this.animating) return;
+                const { currentPath, currentPoint } = this.animationData;
+                if (currentPath >= this.toolpaths.length) {
+                    this.stopSimulation();
                     return;
                 }
-                const path = toolpaths[currentPath];
+
+                const path = this.toolpaths[currentPath];
                 const pointIndex = Math.floor(currentPoint);
                 if (pointIndex >= path.points.length) {
                     this.animationData.currentPath++;
                     this.animationData.currentPoint = 0;
                     return;
                 }
+
                 const point = path.points[pointIndex];
-                const tool = new THREE.Mesh(
-                    new THREE.CylinderGeometry(this.toolDiameter / 2, this.toolDiameter / 2, 5, 16),
-                    new THREE.MeshBasicMaterial({ color: this.getToolColor(currentPath) })
-                );
-                tool.position.set(point.x, point.y, point.z);
-                if (this.machineType === '5-axis' && point.a !== undefined && point.b !== undefined) {
-                    tool.rotation.x = THREE.MathUtils.degToRad(point.a);
-                    tool.rotation.y = THREE.MathUtils.degToRad(point.b);
-                } else {
-                    tool.rotation.x = Math.PI / 2;
-                }
-                tool.userData.isToolpath = true;
-                this.scene.add(tool);
-
-                if (this.machineMesh && this.machineVisible) {
-                    this.machineMesh.children[1].position.set(point.x, point.y, point.z + 20); // Move spindle
-                }
-
-                if (this.materialMesh) {
-                    const cutGeometry = new THREE.CylinderGeometry(this.toolDiameter / 2, this.toolDiameter / 2, 1, 16);
-                    const cutMesh = new THREE.Mesh(cutGeometry, new THREE.MeshBasicMaterial({ visible: false }));
-                    cutMesh.position.set(point.x, point.y, point.z);
-                    this.scene.add(cutMesh);
-                    // Note: Full material removal requires CSG, simplified here
+                if (!this.is2DView) {
+                    const tool = new THREE.Mesh(
+                        new THREE.CylinderGeometry(1, 1, 3, 16),
+                        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    tool.position.set(point.x, point.y, point.z);
+                    tool.rotation.x = THREE.MathUtils.degToRad(point.a || 0) + Math.PI / 2;
+                    tool.userData.isToolpath = true;
+                    this.scene.add(tool);
+                    setTimeout(() => this.scene.remove(tool), 100);
                 }
 
                 this.animationData.currentPoint += this.animationData.speed;
-                setTimeout(() => this.scene.remove(tool), 100);
             }
 
-            checkCollisions(toolpaths) {
-                let collisions = [];
-                const stockX = this.stockBounds.x / 2;
-                const stockY = this.stockBounds.y / 2;
-                const stockZ = this.stockBounds.z / 2;
-
-                toolpaths.forEach((tp, pathIdx) => {
-                    tp.points.forEach((p, pointIdx) => {
-                        if (p.x > stockX || p.x < -stockX || p.y > stockY || p.y < -stockY || p.z > stockZ || p.z < -stockZ) {
-                            collisions.push(`Path ${pathIdx + 1}, Point ${pointIdx + 1}: X=${p.x}, Y=${p.y}, Z=${p.z}`);
-                        }
-                    });
-                });
-
-                return collisions.length ? collisions : null;
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.updateSimulation();
+                if (!this.is2DView) {
+                    this.controls.update();
+                    this.renderer3D.render(this.scene, this.camera3D);
+                }
             }
-
-            exportSTL() {
-                const exporter = new THREE.STLExporter();
-                const stl = exporter.parse(this.scene);
-                const blob = new Blob([stl], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'export.stl';
-                a.click();
-                URL.revokeObjectURL(url);
-            }
-
-            exportPNG() {
-                this.renderer.render(this.scene, this.camera);
-                const dataURL = this.renderer.domElement.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = dataURL;
-                a.download = 'screenshot.png';
-                a.click();
-            }
-        }
-
-        // File Format Detection
-        function detectFileFormat(buffer) {
-            if (buffer.byteLength < 4) return 'UNKNOWN';
-            const header = new Uint8Array(buffer.slice(0, 4));
-            const headerStr = String.fromCharCode(...header);
-            if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
-            if (headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
-            if (headerStr === 'MCX ' || new TextDecoder().decode(buffer).match(/[XYZF]/)) return 'MCX';
-            return 'UNKNOWN';
         }
 
         // Main Application
-        document.addEventListener('DOMContentLoaded', async () => {
-            const viewer = new ThreeDViewer('viewer-container');
+        document.addEventListener('DOMContentLoaded', () => {
+            const viewer = new CNCViewer();
             const fileInput = document.getElementById('file-input');
+            const gcodeInput = document.getElementById('gcode-input');
             const viewToggleBtn = document.getElementById('view-toggle');
+            const simulateBtn = document.getElementById('simulate');
             const resetViewBtn = document.getElementById('reset-view');
-            const editToggleBtn = document.getElementById('edit-toggle');
-            const measureToolBtn = document.getElementById('measure-tool');
-            const animateToolBtn = document.getElementById('animate-tool');
             const toggleMaterialBtn = document.getElementById('toggle-material');
-            const exportSTLBtn = document.getElementById('export-stl');
-            const exportPNGBtn = document.getElementById('export-png');
-            const undoBtn = document.getElementById('undo');
-            const redoBtn = document.getElementById('redo');
-            const collisionCheckBtn = document.getElementById('collision-check');
-            const machineSimBtn = document.getElementById('machine-sim');
-            const errorMessage = document.getElementById('error-message');
-            const editorPanel = document.getElementById('editor-panel');
-            const fileContent = document.getElementById('file-content');
-            const xOffset = document.getElementById('x-offset');
-            const yOffset = document.getElementById('y-offset');
-            const zOffset = document.getElementById('z-offset');
-            const geometryColor = document.getElementById('geometry-color');
-            const materialColor = document.getElementById('material-color');
-            const toolpathColor = document.getElementById('toolpath-color');
-            const simSpeed = document.getElementById('sim-speed');
-            const machineType = document.getElementById('machine-type');
-            const toolDiameter = document.getElementById('tool-diameter');
-            const applyChangesBtn = document.getElementById('apply-changes');
-            const saveFileBtn = document.getElementById('save-file');
-            const progressFill = document.getElementById('progress-fill');
-            const collisionStatus = document.getElementById('collision-status');
+            const loadingOverlay = document.getElementById('loading-overlay');
 
-            let currentFile = null;
-            let currentFormat = null;
-            let currentData = null;
-            let history = [];
-            let historyIndex = -1;
+            function updateInfo(file, data) {
+                document.getElementById('file-name').textContent = file ? file.name : 'None';
+                document.getElementById('file-size').textContent = file ? `${(file.size / 1024).toFixed(2)} KB` : '0 KB';
+                document.getElementById('toolpath-count').textContent = data.toolpaths.length;
+                document.getElementById('units').textContent = data.units;
 
-            const sampleBuffer = createSampleMcam();
-            const sampleFile = new File([sampleBuffer], 'sample.mcam', { type: 'application/octet-stream' });
-            await processFile(sampleFile, sampleBuffer);
-
-            function showLoading(message, progress = 0) {
-                document.getElementById('loading-text').textContent = message;
-                progressFill.style.width = `${progress}%`;
-                document.getElementById('loading-overlay').style.display = 'flex';
-            }
-
-            function hideLoading() {
-                document.getElementById('loading-overlay').style.display = 'none';
-            }
-
-            function showError(message) {
-                console.error(message);
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-                setTimeout(() => errorMessage.style.display = 'none', 5000);
-            }
-
-            function updateFileInfo(file, format, data) {
-                document.getElementById('file-name').textContent = file.name;
-                document.getElementById('file-size').textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-                document.getElementById('file-type').textContent = format;
-                document.getElementById('vertex-count').textContent = data.geometry ? data.geometry.vertices.length / 3 : 0;
-                document.getElementById('face-count').textContent = data.geometry ? data.geometry.faces.length / 3 : 0;
-                document.getElementById('toolpath-count').textContent = data.toolpaths ? data.toolpaths.length : 0;
-                document.getElementById('units').textContent = data.header?.units || 'N/A';
-                let bounds = 'N/A';
-                if (data.geometry || data.toolpaths) {
-                    let minX = Infinity, minY = Infinity, minZ = Infinity;
-                    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-                    if (data.geometry) {
-                        const v = data.geometry.vertices;
-                        for (let i = 0; i < v.length; i += 3) {
-                            minX = Math.min(minX, v[i]);
-                            minY = Math.min(minY, v[i + 1]);
-                            minZ = Math.min(minZ, v[i + 2]);
-                            maxX = Math.max(maxX, v[i]);
-                            maxY = Math.max(maxY, v[i + 1]);
-                            maxZ = Math.max(maxZ, v[i + 2]);
-                        }
-                    }
-                    if (data.toolpaths) {
-                        data.toolpaths.forEach(tp => {
-                            tp.points.forEach(p => {
-                                minX = Math.min(minX, p.x);
-                                minY = Math.min(minY, p.y);
-                                minZ = Math.min(minZ, p.z);
-                                maxX = Math.max(maxX, p.x);
-                                maxY = Math.max(maxY, p.y);
-                                maxZ = Math.max(maxZ, p.z);
-                            });
-                        });
-                    }
-                    bounds = `X: ${minX.toFixed(1)}-${maxX.toFixed(1)}, Y: ${minY.toFixed(1)}-${maxY.toFixed(1)}, Z: ${minZ.toFixed(1)}-${maxZ.toFixed(1)}`;
-                }
-                document.getElementById('bounds').textContent = bounds;
-                const collisions = viewer.checkCollisions(data.toolpaths || []);
-                collisionStatus.textContent = collisions ? `Yes (${collisions.length})` : 'No';
-            }
-
-            async function readFileAsArrayBuffer(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = () => reject(new Error('Failed to read file'));
-                    reader.onprogress = (e) => {
-                        if (e.lengthComputable) {
-                            const percent = (e.loaded / e.total) * 100;
-                            showLoading(`Loading ${file.name}...`, percent);
-                        }
-                    };
-                    reader.readAsArrayBuffer(file);
-                });
-            }
-
-            function applyOffsets(data, xOff, yOff, zOff) {
-                const newData = JSON.parse(JSON.stringify(data));
-                if (newData.geometry) {
-                    const vertices = new Float32Array(newData.geometry.vertices);
-                    for (let i = 0; i < vertices.length; i += 3) {
-                        vertices[i] += xOff;
-                        vertices[i + 1] += yOff;
-                        vertices[i + 2] += zOff;
-                    }
-                    newData.geometry.vertices = vertices;
-                }
-                if (newData.toolpaths) {
-                    newData.toolpaths = newData.toolpaths.map(tp => ({
-                        ...tp,
-                        points: tp.points.map(p => ({
-                            x: p.x + xOff,
-                            y: p.y + yOff,
-                            z: p.z + zOff,
-                            feedRate: p.feedRate,
-                            a: p.a || 0,
-                            b: p.b || 0
-                        }))
-                    }));
-                }
-                return newData;
-            }
-
-            function updateText(rawText, xOff, yOff, zOff) {
-                const lines = rawText.split('\n');
-                return lines.map(line => {
-                    if (line.match(/G[0-1]/) || line.match(/[XYZ]/)) {
-                        return line.replace(/[XYZ][-\d.]+/g, match => {
-                            const axis = match[0];
-                            const value = parseFloat(match.substring(1));
-                            if (axis === 'X') return `X${(value + xOff).toFixed(3)}`;
-                            if (axis === 'Y') return `Y${(value + yOff).toFixed(3)}`;
-                            if (axis === 'Z') return `Z${(value + zOff).toFixed(3)}`;
-                            return match;
-                        });
-                    }
-                    return line;
-                }).join('\n');
-            }
-
-            function addToHistory(data) {
-                if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
-                history.push(JSON.parse(JSON.stringify(data)));
-                historyIndex++;
-                undoBtn.disabled = historyIndex === 0;
-                redoBtn.disabled = historyIndex === history.length - 1;
-            }
-
-            async function processFile(file, arrayBuffer) {
-                showLoading(`Processing ${file.name}...`, 10);
-                const format = detectFileFormat(arrayBuffer);
-                currentFile = file;
-                currentFormat = format;
-                let result;
-
-                if (format === 'MCAM') {
-                    const worker = new Worker(URL.createObjectURL(new Blob([`
-                        onmessage = function(e) {
-                            ${McamParser.toString()}
-                            const parser = new McamParser(e.data);
-                            postMessage(parser.parse());
-                        };
-                    `], { type: 'text/javascript' })));
-                    result = await new Promise(resolve => {
-                        worker.onmessage = e => resolve(e.data);
-                        worker.postMessage(arrayBuffer);
+                let minX = Infinity, minY = Infinity, minZ = Infinity;
+                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                data.toolpaths.forEach(tp => {
+                    tp.points.forEach(p => {
+                        minX = Math.min(minX, p.x);
+                        minY = Math.min(minY, p.y);
+                        minZ = Math.min(minZ, p.z);
+                        maxX = Math.max(maxX, p.x);
+                        maxY = Math.max(maxY, p.y);
+                        maxZ = Math.max(maxZ, p.z);
                     });
-                    worker.terminate();
-                } else if (format === 'MCX') {
-                    const parser = new McxParser(arrayBuffer);
-                    result = parser.parse();
-                } else if (format === 'GCODE') {
-                    const parser = new GcodeParser(arrayBuffer);
-                    result = parser.parse();
-                } else {
-                    throw new Error(`Unsupported file format: ${format}`);
-                }
-
-                showLoading(`Processing ${file.name}...`, 50);
-                if (result.success) {
-                    currentData = result;
-                    addToHistory(result);
-                    updateFileInfo(file, format, result);
-                    viewer.loadGeometry(result);
-                    fileContent.value = result.rawText || "Binary data (not editable directly)";
-                } else {
-                    throw new Error(result.error);
-                }
-                hideLoading();
+                });
+                document.getElementById('bounds').textContent = `X: ${minX.toFixed(1)}-${maxX.toFixed(1)}, Y: ${minY.toFixed(1)}-${maxY.toFixed(1)}, Z: ${minZ.toFixed(1)}-${maxZ.toFixed(1)}`;
             }
 
-            fileInput.addEventListener('change', async (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-                try {
-                    const arrayBuffer = await readFileAsArrayBuffer(file);
-                    await processFile(file, arrayBuffer);
-                } catch (error) {
-                    showError(error.message);
-                    updateFileInfo(file, 'Error', { geometry: null, toolpaths: null });
-                    hideLoading();
+            function loadFile(file) {
+                loadingOverlay.style.display = 'flex';
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const text = reader.result;
+                    gcodeInput.value = text;
+                    const parser = new GcodeParser(text);
+                    const data = parser.parse();
+                    if (data.success) {
+                        viewer.loadToolpaths(data.toolpaths);
+                        updateInfo(file, data);
+                    }
+                    loadingOverlay.style.display = 'none';
+                };
+                reader.readAsText(file);
+            }
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) loadFile(file);
+            });
+
+            gcodeInput.addEventListener('change', () => {
+                const parser = new GcodeParser(gcodeInput.value);
+                const data = parser.parse();
+                if (data.success) {
+                    viewer.loadToolpaths(data.toolpaths);
+                    updateInfo(null, data);
                 }
             });
 
             viewToggleBtn.addEventListener('click', () => {
-                viewer.toggleWireframeMode();
+                viewer.toggleView();
                 viewToggleBtn.classList.toggle('active');
             });
 
-            resetViewBtn.addEventListener('click', () => viewer.resetView());
-
-            editToggleBtn.addEventListener('click', () => {
-                editorPanel.style.display = editorPanel.style.display === 'none' ? 'block' : 'none';
-                editToggleBtn.classList.toggle('active');
-            });
-
-            measureToolBtn.addEventListener('click', () => {
-                viewer.measureMode = !viewer.measureMode;
-                measureToolBtn.classList.toggle('active');
-                if (!viewer.measureMode) viewer.measurePoints = [];
-            });
-
-            animateToolBtn.addEventListener('click', () => {
-                if (!currentData?.toolpaths) return showError('No toolpaths to simulate');
+            simulateBtn.addEventListener('click', () => {
                 if (viewer.animating) {
-                    viewer.stopAnimation();
-                    animateToolBtn.classList.remove('active');
+                    viewer.stopSimulation();
+                    simulateBtn.classList.remove('active');
                 } else {
-                    viewer.startAnimation(currentData.toolpaths);
-                    animateToolBtn.classList.add('active');
+                    viewer.startSimulation();
+                    simulateBtn.classList.add('active');
                 }
             });
+
+            resetViewBtn.addEventListener('click', () => viewer.resetView());
 
             toggleMaterialBtn.addEventListener('click', () => {
                 viewer.toggleMaterial();
                 toggleMaterialBtn.classList.toggle('active');
             });
 
-            exportSTLBtn.addEventListener('click', () => {
-                if (!currentData?.geometry) return showError('No geometry to export');
-                viewer.exportSTL();
-            });
-
-            exportPNGBtn.addEventListener('click', () => viewer.exportPNG());
-
-            undoBtn.addEventListener('click', () => {
-                if (historyIndex <= 0) return;
-                historyIndex--;
-                currentData = JSON.parse(JSON.stringify(history[historyIndex]));
-                viewer.loadGeometry(currentData);
-                fileContent.value = currentData.rawText || "Binary data (not editable directly)";
-                updateFileInfo(currentFile, currentFormat, currentData);
-                undoBtn.disabled = historyIndex === 0;
-                redoBtn.disabled = false;
-            });
-
-            redoBtn.addEventListener('click', () => {
-                if (historyIndex >= history.length - 1) return;
-                historyIndex++;
-                currentData = JSON.parse(JSON.stringify(history[historyIndex]));
-                viewer.loadGeometry(currentData);
-                fileContent.value = currentData.rawText || "Binary data (not editable directly)";
-                updateFileInfo(currentFile, currentFormat, currentData);
-                undoBtn.disabled = false;
-                redoBtn.disabled = historyIndex === history.length - 1;
-            });
-
-            collisionCheckBtn.addEventListener('click', () => {
-                if (!currentData?.toolpaths) return showError('No toolpaths to check');
-                const collisions = viewer.checkCollisions(currentData.toolpaths);
-                if (collisions) {
-                    showError(`Collisions detected:\n${collisions.join('\n')}`);
-                } else {
-                    alert('No collisions detected.');
-                }
-                updateFileInfo(currentFile, currentFormat, currentData);
-            });
-
-            machineSimBtn.addEventListener('click', () => {
-                viewer.toggleMachine();
-                machineSimBtn.classList.toggle('active');
-            });
-
-            applyChangesBtn.addEventListener('click', () => {
-                if (!currentData || !currentFormat) return showError('No file loaded');
-                const xOff = parseFloat(xOffset.value) || 0;
-                const yOff = parseFloat(yOffset.value) || 0;
-                const zOff = parseFloat(zOffset.value) || 0;
-                viewer.geometryColor = parseInt(geometryColor.value.slice(1), 16);
-                viewer.materialColor = parseInt(materialColor.value.slice(1), 16);
-                viewer.toolpathBaseColor = parseInt(toolpathColor.value.slice(1), 16);
-                viewer.simulationSpeed = parseFloat(simSpeed.value) || 0.05;
-                viewer.machineType = machineType.value;
-                viewer.toolDiameter = parseFloat(toolDiameter.value) || 6;
-                currentData = applyOffsets(currentData, xOff, yOff, zOff);
-                viewer.loadGeometry(currentData);
-                if (currentData.rawText) {
-                    currentData.rawText = updateText(currentData.rawText, xOff, yOff, zOff);
-                    fileContent.value = currentData.rawText;
-                }
-                addToHistory(currentData);
-                updateFileInfo(currentFile, currentFormat, currentData);
-            });
-
-            saveFileBtn.addEventListener('click', () => {
-                if (!currentFile || !currentData || !currentFormat) return showError('No file to save');
-                let blob;
-                if (currentFormat === 'MCAM') {
-                    showError('Saving edited MCAM files is not supported yet');
-                    return;
-                } else if (currentFormat === 'MCX' || currentFormat === 'GCODE') {
-                    blob = new Blob([fileContent.value], { type: 'text/plain' });
-                }
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = currentFile.name;
-                a.click();
-                URL.revokeObjectURL(url);
-            });
+            // Load sample G-code
+            const sampleGcode = `G21\nT1\nG0 X0 Y0 Z10 A0\nG1 X10 Y10 Z5 A90 F100\nG1 X20 Y20 Z0 A180\nG0 X0 Y0 Z10 A0`;
+            gcodeInput.value = sampleGcode;
+            const parser = new GcodeParser(sampleGcode);
+            const data = parser.parse();
+            viewer.loadToolpaths(data.toolpaths);
+            updateInfo(null, data);
         });
     </script>
 </body>
