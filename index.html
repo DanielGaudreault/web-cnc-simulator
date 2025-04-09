@@ -4,11 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate CNC Viewer (Haas & Okuma Genos)</title>
-    <link rel="icon" type="image/png" href="images/main logo 2.png"> <!-- Updated Favicon -->
-    <!-- For iOS -->
-    <link rel="apple-touch-icon" sizes="180x180" href="images/icons/apple-touch-icon.png">
-    <!-- For Android -->
-    <link rel="manifest" href="manifest.json"> <!-- Manifest file for PWA -->
     <style>
         body {
             margin: 0;
@@ -30,14 +25,15 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            z-index: 100;
-            padding: 8px 16px;
+            z-index: 1000; /* Increased z-index to ensure it’s on top */
+            padding: 10px 20px; /* Larger padding for visibility */
             background: #4a90e2;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px; /* Larger font size */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Shadow for depth */
         }
 
         #upload-button:hover {
@@ -145,7 +141,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
-            z-index: 200;
+            z-index: 2000; /* Higher than button */
             display: none;
             justify-content: center;
             align-items: center;
@@ -278,7 +274,7 @@
                         y: this.readFloat(), 
                         z: this.readFloat(), 
                         feedRate: this.readFloat(),
-                        a: 0 // Assuming A-axis isn't in MCAM, adjust if needed
+                        a: 0
                     });
                 }
                 return points;
@@ -322,7 +318,7 @@
                         if (points.length) toolpaths.push({ toolNumber: currentTool, points });
                         points = [];
                         currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
-                    } else if (line.match(/G[0-1]/) || (line.includes('G254') || line.includes('G605'))) { // Haas DWO, Okuma DFO
+                    } else if (line.match(/G[0-1]/) || (line.includes('G254') || line.includes('G605'))) {
                         const coords = line.match(/[XYZA][-\d.]+|F[\d.]+/g) || [];
                         const point = { ...lastPos };
                         coords.forEach(c => {
@@ -330,7 +326,7 @@
                             if (c[0] === 'X') point.x = value;
                             if (c[0] === 'Y') point.y = value;
                             if (c[0] === 'Z') point.z = value;
-                            if (c[0] === 'A') point.a = value; // 4-axis rotation
+                            if (c[0] === 'A') point.a = value;
                             if (c[0] === 'F') point.feedRate = value;
                         });
                         points.push(point);
@@ -582,6 +578,12 @@
             const toggleMaterialBtn = document.getElementById('toggle-material');
             const loadingOverlay = document.getElementById('loading-overlay');
 
+            // Ensure button triggers file input
+            uploadButton.addEventListener('click', () => {
+                console.log('Upload button clicked'); // Debug log
+                fileInput.click();
+            });
+
             function updateInfo(file, data) {
                 document.getElementById('file-name').textContent = file ? file.name : 'None';
                 document.getElementById('file-size').textContent = file ? `${(file.size / 1024).toFixed(2)} KB` : '0 KB';
@@ -638,16 +640,15 @@
                     loadingOverlay.style.display = 'none';
                 };
 
-                reader.readAsArrayBuffer(file); // Use ArrayBuffer for flexibility
+                reader.readAsArrayBuffer(file);
             }
-
-            uploadButton.addEventListener('click', () => {
-                fileInput.click(); // Trigger hidden file input
-            });
 
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
-                if (file) loadFile(file);
+                if (file) {
+                    console.log('File selected:', file.name); // Debug log
+                    loadFile(file);
+                }
             });
 
             gcodeInput.addEventListener('change', () => {
