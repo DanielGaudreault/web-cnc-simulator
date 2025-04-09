@@ -31,7 +31,6 @@ class CNCViewer {
         this.renderer3D.setSize(this.canvas2D.width, this.canvas2D.height);
         this.camera3D.position.set(50, 50, 50);
         this.camera3D.lookAt(0, 0, 0);
-        this.controls.enableDSamplers(this.controls);
         this.controls.enableDamping = true;
         this.controls.target.set(0, 0, 0);
         this.scene.add(new THREE.AmbientLight(0x404040));
@@ -52,10 +51,28 @@ class CNCViewer {
         this.viewcubeCamera.position.set(2, 2, 2);
         this.viewcubeCamera.lookAt(0, 0, 0);
 
-        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const cubeMaterial = new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true });
-        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        this.viewcubeScene.add(cube);
+        // Rhombicuboctahedron geometry
+        const vertices = [
+            // Square faces (8 vertices per face, but shared)
+            1, 1, 0, -1, 1, 0, -1, -1, 0, 1, -1, 0, // Top square
+            1, 0, 1, -1, 0, 1, -1, 0, -1, 1, 0, -1, // Middle squares
+            0, 1, 1, 0, -1, 1, 0, -1, -1, 0, 1, -1,
+            1, 1, 0, 1, -1, 0, 1, -1, -1, 1, 1, -1 // Adjusted for connectivity
+        ].map(v => v * 0.7); // Scale down to fit viewcube
+
+        const faces = [
+            // Square faces
+            0, 1, 2, 3,  // Top
+            4, 5, 6, 7,  // Front
+            8, 9, 10, 11, // Right
+            // Triangle faces (simplified for demo)
+            0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11
+        ];
+
+        const geometry = new THREE.PolyhedronGeometry(vertices, faces, 0.7, 0);
+        const material = new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true });
+        const rhombicuboctahedron = new THREE.Mesh(geometry, material);
+        this.viewcubeScene.add(rhombicuboctahedron);
 
         const axesHelper = new THREE.AxesHelper(1.5);
         this.viewcubeScene.add(axesHelper);
