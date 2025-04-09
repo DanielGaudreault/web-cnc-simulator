@@ -22,6 +22,19 @@ body {
     display: none;
 }
 
+#top-toolbar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 100;
+    display: flex;
+    gap: 8px;
+    background: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 .toolbar {
     position: absolute;
     top: 10px;
