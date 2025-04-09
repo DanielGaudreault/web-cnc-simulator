@@ -10,6 +10,12 @@
     <div id="viewer-container">
         <input type="file" id="file-input" accept=".gcode,.mcam,.nc,.tap" />
 
+        <div id="top-toolbar">
+            <button id="save-btn" class="tool-button" data-tooltip="Save G-code">Save</button>
+            <button id="sample-circle-btn" class="tool-button" data-tooltip="Load Circle Sample">Circle</button>
+            <button id="sample-square-btn" class="tool-button" data-tooltip="Load Square Sample">Square</button>
+        </div>
+
         <div id="sidebar">
             <h3>G-Code Editor</h3>
             <textarea id="gcode-input" placeholder="Paste or edit G-code here (MCAM may show limited data)..."></textarea>
@@ -22,7 +28,7 @@
                 <div class="info-item"><span class="info-label">Units:</span><span id="units">N/A</span></div>
                 <div class="info-item"><span class="info-label">Current Tool:</span><span id="current-tool">N/A</span></div>
             </div>
-            <div id="fixed-plot-btn" class="dropdown-buttons">
+            <div id="plot-buttons" class="dropdown-buttons">
                 <button id="plot-file-btn" class="nc-btn mx-1">Plot</button>
                 <button id="clear-plot" class="nc-btn alt mx-1">
                     <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="ban" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-ban fa-w-16">
