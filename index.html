@@ -12,17 +12,20 @@
             color: #333;
             background-color: #f5f5f5;
             overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         #viewer-container {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
+            flex: 1;
             display: flex;
+            width: 100%;
+            height: 100%;
         }
 
         #file-input {
-            display: none; /* Hidden, triggered by button */
+            display: none;
         }
 
         .toolbar {
@@ -36,6 +39,7 @@
             padding: 8px;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap; /* Allow wrapping on small screens */
         }
 
         .tool-button, #upload-button {
@@ -46,6 +50,7 @@
             padding: 6px 12px;
             cursor: pointer;
             font-size: 12px;
+            transition: background 0.2s;
         }
 
         .tool-button:hover, #upload-button:hover {
@@ -57,13 +62,15 @@
         }
 
         #sidebar {
-            width: 300px;
+            width: 320px; /* Slightly wider for better fit */
+            min-width: 200px;
             height: 100%;
             background: #fff;
-            padding: 10px;
+            padding: 15px;
             border-right: 1px solid #ddd;
             overflow-y: auto;
-            z-index: 100;
+            box-sizing: border-box;
+            flex-shrink: 0;
         }
 
         #sidebar h3 {
@@ -74,13 +81,14 @@
 
         #gcode-input {
             width: 100%;
-            height: 50%;
-            resize: none;
+            height: 60%; /* Increased height */
+            resize: vertical; /* Allow vertical resize */
             font-family: monospace;
             font-size: 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
             padding: 5px;
+            box-sizing: border-box;
         }
 
         #info-panel {
@@ -99,8 +107,9 @@
         }
 
         #canvas-container {
-            flex-grow: 1;
+            flex: 1;
             position: relative;
+            overflow: hidden;
         }
 
         #canvas-2d, #canvas-3d {
@@ -142,6 +151,18 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #sidebar {
+                width: 250px;
+            }
+            .toolbar {
+                right: 5px;
+                top: 5px;
+                padding: 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -150,7 +171,7 @@
 
         <div id="sidebar">
             <h3>G-Code Editor</h3>
-            <textarea id="gcode-input" placeholder="Paste or edit G-code here (MCAM shows binary info)..."></textarea>
+            <textarea id="gcode-input" placeholder="Paste or edit G-code here (MCAM may show limited data)..."></textarea>
             <div id="info-panel">
                 <h3>File Info</h3>
                 <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
@@ -184,7 +205,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // MCAM Parser with Enhanced Debugging
+        // MCAM Parser with Fallback
         class McamParser {
             constructor(buffer) {
                 this.buffer = buffer;
@@ -195,20 +216,29 @@
             }
 
             parse() {
-                console.log('Parsing MCAM file, size:', this.buffer.byteLength);
+                console.log('MCAM Parser: File size:', this.buffer.byteLength);
                 try {
                     this.checkFileSize();
                     const header = this.parseHeader();
-                    console.log('Header:', header);
+                    console.log('MCAM Header:', header);
                     if (!this.supportedVersions.includes(header.version)) throw new Error(`Unsupported MCAM version ${header.version}`);
                     const geometry = this.parseGeometry(header.version);
-                    console.log('Geometry parsed, vertices:', geometry.vertices.length / 3, 'faces:', geometry.faces.length / 3);
+                    console.log('MCAM Geometry: vertices=', geometry.vertices.length / 3, 'faces=', geometry.faces.length / 3);
                     const toolpaths = this.parseToolpaths(header.version);
-                    console.log('Toolpaths parsed:', toolpaths.length);
+                    console.log('MCAM Toolpaths:', toolpaths.length);
                     return { success: true, header, geometry, toolpaths };
                 } catch (error) {
-                    console.error('MCAM parsing error:', error.message);
-                    return { success: false, error: error.message };
+                    console.error('MCAM Binary Parsing Failed:', error.message);
+                    // Fallback: Try parsing as text (e.g., NCI or G-code inside)
+                    const text = new TextDecoder().decode(this.buffer);
+                    console.log('MCAM Fallback: First 100 chars:', text.slice(0, 100));
+                    const gcodeParser = new GcodeParser(text);
+                    const gcodeData = gcodeParser.parse();
+                    if (gcodeData.success && gcodeData.toolpaths.length > 0) {
+                        console.log('MCAM Fallback: Found valid G-code');
+                        return { success: true, toolpaths: gcodeData.toolpaths, units: gcodeData.units };
+                    }
+                    return { success: false, error: `MCAM parsing failed: ${error.message}` };
                 }
             }
 
@@ -218,7 +248,6 @@
 
             parseHeader() {
                 const magic = this.readString(4);
-                console.log('Magic:', magic);
                 if (!['MCAM', 'MMC2'].includes(magic)) throw new Error(`Invalid header: ${magic}`);
                 const version = this.readUint32();
                 const fileSize = this.readUint32();
@@ -274,7 +303,7 @@
                         y: this.readFloat(), 
                         z: this.readFloat(), 
                         feedRate: this.readFloat(),
-                        a: 0 // Adjust if your MCAM includes A-axis data
+                        a: 0
                     });
                 }
                 return points;
@@ -638,7 +667,6 @@
                 reader.onload = () => {
                     const buffer = reader.result;
                     const format = detectFileFormat(buffer, file.name);
-
                     console.log('Detected format:', format);
 
                     if (format === 'MCAM') {
@@ -647,7 +675,7 @@
                         if (data.success) {
                             viewer.loadToolpaths(data.toolpaths);
                             updateInfo(file, data);
-                            gcodeInput.value = 'Binary MCAM file - toolpaths only (not editable)';
+                            gcodeInput.value = data.geometry ? 'Binary MCAM file - toolpaths only (not editable)' : gcodeInput.value;
                         } else {
                             alert(`MCAM parsing failed: ${data.error}`);
                         }
