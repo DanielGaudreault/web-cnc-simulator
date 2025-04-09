@@ -6,7 +6,7 @@ function detectFileFormat(buffer, fileName) {
     console.log('File header:', headerStr, 'Extension:', ext);
     if (headerStr === 'MCAM' || headerStr === 'MMC2') return 'MCAM';
     if (ext === 'gcode' || ext === 'nc' || ext === 'tap' || headerStr.startsWith('%') || new TextDecoder().decode(buffer).match(/G[0-1]/)) return 'GCODE';
-    return 'unknown';
+    return 'UNKNOWN';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -33,7 +33,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const vcTopBtn = document.getElementById('vc-top');
     const vcFrontBtn = document.getElementById('vc-front');
     const vcRightBtn = document.getElementById('vc-right');
+    const saveBtn = document.getElementById('save-btn');
+    const sampleCircleBtn = document.getElementById('sample-circle-btn');
+    const sampleSquareBtn = document.getElementById('sample-square-btn');
     const loadingOverlay = document.getElementById('loading-overlay');
+
+    // Sample G-code definitions
+    const sampleCircleGcode = `
+        G21 ; Set units to millimeters
+        G90 ; Absolute positioning
+        T1 M6 ; Tool change to tool 1
+        G0 X0 Y0 Z5 ; Move to starting position
+        G1 Z-1 F100 ; Lower tool
+        G2 X0 Y0 I10 J0 F200 ; Draw circle (radius 10mm)
+        G0 Z5 ; Raise tool
+    `;
+
+    const sampleSquareGcode = `
+        G21 ; Set units to millimeters
+        G90 ; Absolute positioning
+        T1 M6 ; Tool change to tool 1
+        G0 X-10 Y-10 Z5 ; Move to starting position
+        G1 Z-1 F100 ; Lower tool
+        G1 X10 Y-10 F200 ; Draw square
+        G1 X10 Y10
+        G1 X-10 Y10
+        G1 X-10 Y-10
+        G0 Z5 ; Raise tool
+    `;
 
     uploadButton.addEventListener('click', () => {
         console.log('Upload button clicked');
@@ -155,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearPlotBtn.addEventListener('click', () => {
         viewer.clearPlot();
+        gcodeInput.value = '';
     });
 
     settingsPlotBtn.addEventListener('click', () => {
@@ -170,6 +198,29 @@ document.addEventListener('DOMContentLoaded', () => {
     vcTopBtn.addEventListener('click', () => viewer.setView('top'));
     vcFrontBtn.addEventListener('click', () => viewer.setView('front'));
     vcRightBtn.addEventListener('click', () => viewer.setView('right'));
+
+    saveBtn.addEventListener('click', () => {
+        const gcodeText = gcodeInput.value;
+        if (!gcodeText.trim()) {
+            alert('No G-code to save.');
+            return;
+        }
+        const blob = new Blob([gcodeText], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'cnc_program.gcode';
+        link.click();
+    });
+
+    sampleCircleBtn.addEventListener('click', () => {
+        gcodeInput.value = sampleCircleGcode;
+        viewer.plotGcode();
+    });
+
+    sampleSquareBtn.addEventListener('click', () => {
+        gcodeInput.value = sampleSquareGcode;
+        viewer.plotGcode();
+    });
 
     gcodeInput.value = '';
 });
