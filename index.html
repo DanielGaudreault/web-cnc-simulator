@@ -150,7 +150,7 @@
             border-radius: 4px;
         }
 
-        .editor-panel input[type="number"], .editor-panel input[type="color"] {
+        .editor-panel input[type="number"], .editor-panel input[type="color"], .editor-panel select {
             width: 80px;
             padding: 5px;
             margin: 5px 0;
@@ -256,6 +256,8 @@
             <button class="tool-button" id="export-png" data-tooltip="Take screenshot">PNG</button>
             <button class="tool-button" id="undo" data-tooltip="Undo last change">Undo</button>
             <button class="tool-button" id="redo" data-tooltip="Redo last change">Redo</button>
+            <button class="tool-button" id="collision-check" data-tooltip="Check for collisions">Collision</button>
+            <button class="tool-button" id="machine-sim" data-tooltip="Toggle machine simulation">Machine</button>
         </div>
 
         <div class="info-panel">
@@ -268,6 +270,7 @@
             <div class="info-item"><span class="info-label">Toolpaths:</span><span id="toolpath-count">0</span></div>
             <div class="info-item"><span class="info-label">Bounds:</span><span id="bounds">N/A</span></div>
             <div class="info-item"><span class="info-label">Units:</span><span id="units">N/A</span></div>
+            <div class="info-item"><span class="info-label">Collisions:</span><span id="collision-status">N/A</span></div>
         </div>
 
         <div class="editor-panel" id="editor-panel">
@@ -285,9 +288,14 @@
                 <label>Material: <input type="color" id="material-color" value="#aaaaaa"></label><br>
                 <label>Toolpath: <input type="color" id="toolpath-color" value="#ff0000"></label>
             </div>
-            <h3>Simulation Speed</h3>
+            <h3>Simulation Settings</h3>
             <div>
-                <label>Speed: <input type="number" id="sim-speed" value="0.05" step="0.01" min="0.01" max="1"></label>
+                <label>Speed: <input type="number" id="sim-speed" value="0.05" step="0.01" min="0.01" max="1"></label><br>
+                <label>Machine: <select id="machine-type">
+                    <option value="3-axis">3-Axis Mill</option>
+                    <option value="5-axis">5-Axis Mill</option>
+                </select></label><br>
+                <label>Tool Dia (mm): <input type="number" id="tool-diameter" value="6" step="0.1" min="0.1"></label>
             </div>
             <button id="apply-changes">Apply Changes</button>
             <button id="save-file">Save File</button>
@@ -325,9 +333,9 @@
             });
             view.setUint32(offset, 12, true); offset += 4;
             const cubeFaces = [
-                0, 1, 2,  0, 2, 3,  1, 5, 6,  1, 6, 2,
-                5, 4, 7,  5, 7, 6,  4, 0, 3,  4, 3, 7,
-                3, 2, 6,  3, 6, 7,  4, 5, 1,  4, 1, 0
+                0, 1, 2, 0, 2, 3, 1, 5, 6, 1, 6, 2,
+                5, 4, 7, 5, 7, 6, 4, 0, 3, 4, 3, 7,
+                3, 2, 6, 3, 6, 7, 4, 5, 1, 4, 1, 0
             ];
             cubeFaces.forEach(f => { view.setUint32(offset, f, true); offset += 4; });
             view.setUint16(offset, 1, true); offset += 2;
@@ -440,7 +448,7 @@
                     const toolpaths = [];
                     let currentTool = 0;
                     let points = [];
-                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0 };
+                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0, a: 0, b: 0 }; // Added A, B for multi-axis
                     for (let line of lines) {
                         line = line.trim();
                         if (!line || line.startsWith(';') || line.startsWith('(')) continue;
@@ -448,8 +456,8 @@
                             if (points.length) toolpaths.push({ toolNumber: currentTool, points });
                             points = [];
                             currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
-                        } else if (line.match(/[XYZF]/)) {
-                            const coords = line.match(/[XYZF][-\d.]+/g) || [];
+                        } else if (line.match(/[XYZFAB]/)) { // Added A, B for multi-axis
+                            const coords = line.match(/[XYZFAB][-\d.]+/g) || [];
                             const point = { ...lastPos };
                             coords.forEach(c => {
                                 const value = parseFloat(c.substring(1));
@@ -457,6 +465,8 @@
                                 if (c[0] === 'Y') point.y = value;
                                 if (c[0] === 'Z') point.z = value;
                                 if (c[0] === 'F') point.feedRate = value;
+                                if (c[0] === 'A') point.a = value; // Tilt
+                                if (c[0] === 'B') point.b = value; // Rotation
                             });
                             points.push(point);
                             lastPos = { ...point };
@@ -483,7 +493,7 @@
                     const toolpaths = [];
                     let currentTool = 0;
                     let points = [];
-                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0 };
+                    let lastPos = { x: 0, y: 0, z: 0, feedRate: 0, a: 0, b: 0 }; // Added A, B for multi-axis
                     let units = 'mm';
                     for (let line of lines) {
                         line = line.trim();
@@ -495,7 +505,7 @@
                             points = [];
                             currentTool = parseInt(line.match(/T(\d+)/)?.[1]) || 0;
                         } else if (line.match(/G[0-1]/)) {
-                            const coords = line.match(/[XYZF][-\d.]+/g) || [];
+                            const coords = line.match(/[XYZFAB][-\d.]+/g) || [];
                             const point = { ...lastPos };
                             coords.forEach(c => {
                                 const value = parseFloat(c.substring(1));
@@ -503,6 +513,8 @@
                                 if (c[0] === 'Y') point.y = value;
                                 if (c[0] === 'Z') point.z = value;
                                 if (c[0] === 'F') point.feedRate = value;
+                                if (c[0] === 'A') point.a = value;
+                                if (c[0] === 'B') point.b = value;
                             });
                             points.push(point);
                             lastPos = { ...point };
@@ -516,7 +528,7 @@
             }
         }
 
-        // 3D Viewer
+        // 3D Viewer with Mastercam Enhancements
         class ThreeDViewer {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
@@ -536,6 +548,11 @@
                 this.materialMesh = null;
                 this.showMaterial = true;
                 this.simulationSpeed = 0.05;
+                this.toolDiameter = 6;
+                this.machineType = '3-axis';
+                this.machineVisible = false;
+                this.machineMesh = null;
+                this.stockBounds = { x: 100, y: 100, z: 50 };
                 this.init();
             }
 
@@ -600,6 +617,7 @@
                     }
                 }
                 if (zoomTarget) this.zoomToObject(zoomTarget);
+                this.loadMachine();
             }
 
             loadMaterial(data) {
@@ -636,9 +654,9 @@
                     maxX = maxY = maxZ = 10;
                 }
 
-                const width = Math.max(maxX - minX + 10, 20);
-                const height = Math.max(maxY - minY + 10, 20);
-                const depth = Math.max(maxZ - minZ + 10, 20);
+                const width = Math.max(maxX - minX + 10, this.stockBounds.x);
+                const height = Math.max(maxY - minY + 10, this.stockBounds.y);
+                const depth = Math.max(maxZ - minZ + 10, this.stockBounds.z);
                 const materialGeometry = new THREE.BoxGeometry(width, height, depth);
                 const materialMaterial = new THREE.MeshPhongMaterial({
                     color: this.materialColor,
@@ -656,10 +674,41 @@
                 this.scene.add(this.materialMesh);
             }
 
+            loadMachine() {
+                if (this.machineMesh) this.scene.remove(this.machineMesh);
+                if (!this.machineVisible) return;
+
+                const machineGeometry = new THREE.Group();
+                const table = new THREE.Mesh(
+                    new THREE.BoxGeometry(150, 150, 10),
+                    new THREE.MeshPhongMaterial({ color: 0x666666 })
+                );
+                table.position.set(0, 0, -5);
+                machineGeometry.add(table);
+
+                const spindle = new THREE.Mesh(
+                    new THREE.CylinderGeometry(5, 5, 20, 32),
+                    new THREE.MeshPhongMaterial({ color: 0x888888 })
+                );
+                spindle.position.set(0, 0, 20);
+                spindle.rotation.x = Math.PI / 2;
+                machineGeometry.add(spindle);
+
+                this.machineMesh = machineGeometry;
+                this.scene.add(this.machineMesh);
+            }
+
             renderToolpaths(toolpaths) {
                 this.scene.children.filter(obj => obj.userData.isToolpath).forEach(obj => this.scene.remove(obj));
                 toolpaths.forEach((toolpath, index) => {
-                    const points = toolpath.points.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                    const points = toolpath.points.map(p => {
+                        const vec = new THREE.Vector3(p.x, p.y, p.z);
+                        if (this.machineType === '5-axis' && p.a !== undefined && p.b !== undefined) {
+                            vec.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(p.a));
+                            vec.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(p.b));
+                        }
+                        return vec;
+                    });
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
                     const material = new THREE.LineBasicMaterial({
                         color: this.getToolColor(index),
@@ -694,18 +743,24 @@
                     }
                 });
                 this.materialMesh = null;
+                this.machineMesh = null;
             }
 
             toggleWireframeMode() {
                 this.wireframeMode = !this.wireframeMode;
                 this.scene.traverse(child => {
-                    if (child.isMesh && child !== this.materialMesh) child.material.wireframe = this.wireframeMode;
+                    if (child.isMesh && child !== this.materialMesh && child !== this.machineMesh) child.material.wireframe = this.wireframeMode;
                 });
             }
 
             toggleMaterial() {
                 this.showMaterial = !this.showMaterial;
                 if (this.materialMesh) this.materialMesh.visible = this.showMaterial;
+            }
+
+            toggleMachine() {
+                this.machineVisible = !this.machineVisible;
+                this.loadMachine();
             }
 
             resetView() {
@@ -757,23 +812,50 @@
                 }
                 const point = path.points[pointIndex];
                 const tool = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.5, 0.5, 2, 16),
+                    new THREE.CylinderGeometry(this.toolDiameter / 2, this.toolDiameter / 2, 5, 16),
                     new THREE.MeshBasicMaterial({ color: this.getToolColor(currentPath) })
                 );
                 tool.position.set(point.x, point.y, point.z);
-                tool.rotation.x = Math.PI / 2;
+                if (this.machineType === '5-axis' && point.a !== undefined && point.b !== undefined) {
+                    tool.rotation.x = THREE.MathUtils.degToRad(point.a);
+                    tool.rotation.y = THREE.MathUtils.degToRad(point.b);
+                } else {
+                    tool.rotation.x = Math.PI / 2;
+                }
                 tool.userData.isToolpath = true;
                 this.scene.add(tool);
 
+                if (this.machineMesh && this.machineVisible) {
+                    this.machineMesh.children[1].position.set(point.x, point.y, point.z + 20); // Move spindle
+                }
+
                 if (this.materialMesh) {
-                    const cutGeometry = new THREE.BoxGeometry(1, 1, 1);
+                    const cutGeometry = new THREE.CylinderGeometry(this.toolDiameter / 2, this.toolDiameter / 2, 1, 16);
                     const cutMesh = new THREE.Mesh(cutGeometry, new THREE.MeshBasicMaterial({ visible: false }));
                     cutMesh.position.set(point.x, point.y, point.z);
                     this.scene.add(cutMesh);
+                    // Note: Full material removal requires CSG, simplified here
                 }
 
                 this.animationData.currentPoint += this.animationData.speed;
                 setTimeout(() => this.scene.remove(tool), 100);
+            }
+
+            checkCollisions(toolpaths) {
+                let collisions = [];
+                const stockX = this.stockBounds.x / 2;
+                const stockY = this.stockBounds.y / 2;
+                const stockZ = this.stockBounds.z / 2;
+
+                toolpaths.forEach((tp, pathIdx) => {
+                    tp.points.forEach((p, pointIdx) => {
+                        if (p.x > stockX || p.x < -stockX || p.y > stockY || p.y < -stockY || p.z > stockZ || p.z < -stockZ) {
+                            collisions.push(`Path ${pathIdx + 1}, Point ${pointIdx + 1}: X=${p.x}, Y=${p.y}, Z=${p.z}`);
+                        }
+                    });
+                });
+
+                return collisions.length ? collisions : null;
             }
 
             exportSTL() {
@@ -823,6 +905,8 @@
             const exportPNGBtn = document.getElementById('export-png');
             const undoBtn = document.getElementById('undo');
             const redoBtn = document.getElementById('redo');
+            const collisionCheckBtn = document.getElementById('collision-check');
+            const machineSimBtn = document.getElementById('machine-sim');
             const errorMessage = document.getElementById('error-message');
             const editorPanel = document.getElementById('editor-panel');
             const fileContent = document.getElementById('file-content');
@@ -833,9 +917,12 @@
             const materialColor = document.getElementById('material-color');
             const toolpathColor = document.getElementById('toolpath-color');
             const simSpeed = document.getElementById('sim-speed');
+            const machineType = document.getElementById('machine-type');
+            const toolDiameter = document.getElementById('tool-diameter');
             const applyChangesBtn = document.getElementById('apply-changes');
             const saveFileBtn = document.getElementById('save-file');
             const progressFill = document.getElementById('progress-fill');
+            const collisionStatus = document.getElementById('collision-status');
 
             let currentFile = null;
             let currentFormat = null;
@@ -902,6 +989,8 @@
                     bounds = `X: ${minX.toFixed(1)}-${maxX.toFixed(1)}, Y: ${minY.toFixed(1)}-${maxY.toFixed(1)}, Z: ${minZ.toFixed(1)}-${maxZ.toFixed(1)}`;
                 }
                 document.getElementById('bounds').textContent = bounds;
+                const collisions = viewer.checkCollisions(data.toolpaths || []);
+                collisionStatus.textContent = collisions ? `Yes (${collisions.length})` : 'No';
             }
 
             async function readFileAsArrayBuffer(file) {
@@ -937,7 +1026,9 @@
                             x: p.x + xOff,
                             y: p.y + yOff,
                             z: p.z + zOff,
-                            feedRate: p.feedRate
+                            feedRate: p.feedRate,
+                            a: p.a || 0,
+                            b: p.b || 0
                         }))
                     }));
                 }
@@ -1088,6 +1179,22 @@
                 redoBtn.disabled = historyIndex === history.length - 1;
             });
 
+            collisionCheckBtn.addEventListener('click', () => {
+                if (!currentData?.toolpaths) return showError('No toolpaths to check');
+                const collisions = viewer.checkCollisions(currentData.toolpaths);
+                if (collisions) {
+                    showError(`Collisions detected:\n${collisions.join('\n')}`);
+                } else {
+                    alert('No collisions detected.');
+                }
+                updateFileInfo(currentFile, currentFormat, currentData);
+            });
+
+            machineSimBtn.addEventListener('click', () => {
+                viewer.toggleMachine();
+                machineSimBtn.classList.toggle('active');
+            });
+
             applyChangesBtn.addEventListener('click', () => {
                 if (!currentData || !currentFormat) return showError('No file loaded');
                 const xOff = parseFloat(xOffset.value) || 0;
@@ -1097,6 +1204,8 @@
                 viewer.materialColor = parseInt(materialColor.value.slice(1), 16);
                 viewer.toolpathBaseColor = parseInt(toolpathColor.value.slice(1), 16);
                 viewer.simulationSpeed = parseFloat(simSpeed.value) || 0.05;
+                viewer.machineType = machineType.value;
+                viewer.toolDiameter = parseFloat(toolDiameter.value) || 6;
                 currentData = applyOffsets(currentData, xOff, yOff, zOff);
                 viewer.loadGeometry(currentData);
                 if (currentData.rawText) {
