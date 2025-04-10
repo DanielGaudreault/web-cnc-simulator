@@ -24,8 +24,8 @@ body {
 
 #top-toolbar {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 5px; /* Moved up from 10px */
+    left: 5px; /* Moved left from 10px */
     z-index: 100;
     display: flex;
     gap: 8px;
@@ -37,8 +37,8 @@ body {
 
 .toolbar {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 5px;
+    right: 5px;
     z-index: 100;
     display: flex;
     flex-direction: column;
@@ -57,7 +57,7 @@ body {
     justify-content: flex-end;
 }
 
-.tool-button, #upload-button {
+.tool-button {
     background: #4a90e2;
     color: white;
     border: none;
@@ -77,7 +77,7 @@ body {
     height: 16px;
 }
 
-.tool-button:hover, #upload-button:hover {
+.tool-button:hover {
     background: #357ab8;
 }
 
@@ -108,14 +108,13 @@ body {
 #sidebar {
     width: 320px;
     min-width: 200px;
-    height: 100%;
+    height: calc(100% - 10px); /* Adjusted to fit within viewport */
     background: #fff;
     padding: 15px;
     border-right: 1px solid #ddd;
     overflow-y: auto;
     box-sizing: border-box;
     flex-shrink: 0;
-    position: relative;
     display: flex;
     flex-direction: column;
 }
@@ -143,8 +142,9 @@ body {
 
 #gcode-input {
     width: 100%;
-    flex-grow: 1;
-    resize: none;
+    flex: 1 1 auto;
+    min-height: 100px;
+    resize: vertical;
     font-family: monospace;
     font-size: 12px;
     border: 1px solid #ddd;
@@ -159,6 +159,7 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
+    height: calc(100% - 60px); /* Adjusted to leave room for control bar */
 }
 
 #canvas-2d, #canvas-3d {
@@ -265,7 +266,7 @@ body {
 
 #control-bar {
     position: absolute;
-    bottom: 10px;
+    bottom: 5px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
@@ -273,6 +274,7 @@ body {
     padding: 5px;
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: auto;
 }
 
 .control-icons {
