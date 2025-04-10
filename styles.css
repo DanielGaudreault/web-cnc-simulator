@@ -24,13 +24,13 @@ body {
 
 #top-toolbar {
     position: absolute;
-    top: 5px; /* Moved up from 10px */
-    left: 5px; /* Moved left from 10px */
+    top: 2px; /* Moved up further from 5px */
+    left: 2px; /* Moved left further from 5px */
     z-index: 100;
     display: flex;
     gap: 8px;
     background: #fff;
-    padding: 8px;
+    padding: 6px; /* Slightly reduced padding */
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -108,7 +108,7 @@ body {
 #sidebar {
     width: 320px;
     min-width: 200px;
-    height: calc(100% - 10px); /* Adjusted to fit within viewport */
+    height: 100%; /* Full height of container */
     background: #fff;
     padding: 15px;
     border-right: 1px solid #ddd;
@@ -159,7 +159,7 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
-    height: calc(100% - 60px); /* Adjusted to leave room for control bar */
+    height: 100%; /* Full height, adjusted dynamically in JS */
 }
 
 #canvas-2d, #canvas-3d {
@@ -212,6 +212,11 @@ body {
         right: 5px;
         top: 5px;
         padding: 5px;
+    }
+    #top-toolbar {
+        top: 2px;
+        left: 2px;
+        padding: 4px;
     }
 }
 
@@ -313,7 +318,7 @@ body {
 }
 
 .nc-btn {
-    background: #4a90e2;
+    background: #4-IM90e2;
     color: white;
     border: none;
     border-radius: 4px;
