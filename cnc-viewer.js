@@ -71,6 +71,11 @@ class CNCViewer {
         const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
         this.scene.add(zAxis);
 
+        // Optional: Add 3D grid plane (XY plane at Z=0)
+        const gridHelper = new THREE.GridHelper(gridSize, 20, 0x888888, 0x888888);
+        gridHelper.position.set(0, 0, -0.1); // Slightly below to avoid z-fighting
+        this.scene.add(gridHelper);
+
         this.animate();
         window.addEventListener('resize', () => this.resizeCanvas());
     }
@@ -91,10 +96,12 @@ class CNCViewer {
 
     resizeCanvas() {
         const container = document.getElementById('canvas-container');
+        const controlBar = document.getElementById('control-bar');
+        const controlBarHeight = controlBar.offsetHeight + 10; // Include padding
         this.canvas2D.width = container.clientWidth;
-        this.canvas2D.height = container.clientHeight;
-        this.renderer3D.setSize(container.clientWidth, container.clientHeight);
-        this.camera3D.aspect = container.clientWidth / container.clientHeight;
+        this.canvas2D.height = container.clientHeight - controlBarHeight;
+        this.renderer3D.setSize(container.clientWidth, container.clientHeight - controlBarHeight);
+        this.camera3D.aspect = container.clientWidth / (container.clientHeight - controlBarHeight);
         this.camera3D.updateProjectionMatrix();
     }
 
@@ -115,8 +122,9 @@ class CNCViewer {
         const offsetX = this.canvas2D.width / 2;
         const offsetY = this.canvas2D.height / 2;
 
-        this.ctx2D.strokeStyle = '#888888';
-        this.ctx2D.lineWidth = 0.5;
+        // Enhanced 2D grid
+        this.ctx2D.strokeStyle = '#666666'; // Darker gray for visibility
+        this.ctx2D.lineWidth = 0.8;
         for (let i = -50; i <= 50; i += 5) {
             this.ctx2D.beginPath();
             this.ctx2D.moveTo(i * scale + offsetX, -50 * scale + offsetY);
@@ -128,6 +136,21 @@ class CNCViewer {
             this.ctx2D.stroke();
         }
 
+        // Highlight origin axes
+        this.ctx2D.strokeStyle = '#0000ff'; // X-axis
+        this.ctx2D.lineWidth = 1.5;
+        this.ctx2D.beginPath();
+        this.ctx2D.moveTo(0 * scale + offsetX, -50 * scale + offsetY);
+        this.ctx2D.lineTo(0 * scale + offsetX, 50 * scale + offsetY);
+        this.ctx2D.stroke();
+
+        this.ctx2D.strokeStyle = '#00ff00'; // Y-axis
+        this.ctx2D.beginPath();
+        this.ctx2D.moveTo(-50 * scale + offsetX, 0 * scale + offsetY);
+        this.ctx2D.lineTo(50 * scale + offsetX, 0 * scale + offsetY);
+        this.ctx2D.stroke();
+
+        // Toolpaths
         this.ctx2D.strokeStyle = '#0000ff';
         this.ctx2D.lineWidth = 1;
         this.toolpaths.forEach(tp => {
