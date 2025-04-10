@@ -7,7 +7,7 @@ class CNCViewer {
         this.renderer3D = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas-3d'), antialias: true });
         this.controls = new THREE.OrbitControls(this.camera3D, this.renderer3D.domElement);
         this.toolpaths = [];
-        this.is2DView = false;
+        this.is2DView = false; // Start in 3D mode, toggle to 2D to test
         this.showMaterial = false;
         this.materialMesh = null;
         this.animating = false;
@@ -19,7 +19,7 @@ class CNCViewer {
             canvas: document.getElementById('viewcube-canvas'), 
             antialias: true 
         });
-        this.history = []; // For undo/redo
+        this.history = [];
         this.redoStack = [];
         this.init();
         this.initViewcube();
@@ -49,7 +49,6 @@ class CNCViewer {
         ]);
         const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
         const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
-        xAxis.position.set(0, 0, -0.1);
         this.scene.add(xAxis);
 
         // Y-axis (Green)
@@ -59,7 +58,6 @@ class CNCViewer {
         ]);
         const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
         const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
-        yAxis.position.set(0, 0, -0.1);
         this.scene.add(yAxis);
 
         // Z-axis (Red)
@@ -71,10 +69,12 @@ class CNCViewer {
         const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
         this.scene.add(zAxis);
 
-        // Optional: Add 3D grid plane (XY plane at Z=0)
-        const gridHelper = new THREE.GridHelper(gridSize, 20, 0x888888, 0x888888);
-        gridHelper.position.set(0, 0, -0.1); // Slightly below to avoid z-fighting
+        // 3D Grid (XY plane, more visible)
+        const gridHelper = new THREE.GridHelper(gridSize, 20, 0x000000, 0x000000); // Black lines for contrast
+        gridHelper.material.linewidth = 2; // Thicker lines
+        gridHelper.position.set(0, 0, 0); // At Z=0, no offset
         this.scene.add(gridHelper);
+        console.log('3D grid added to scene'); // Debug
 
         this.animate();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -97,7 +97,7 @@ class CNCViewer {
     resizeCanvas() {
         const container = document.getElementById('canvas-container');
         const controlBar = document.getElementById('control-bar');
-        const controlBarHeight = controlBar.offsetHeight + 10; // Include padding
+        const controlBarHeight = controlBar.offsetHeight + 10;
         this.canvas2D.width = container.clientWidth;
         this.canvas2D.height = container.clientHeight - controlBarHeight;
         this.renderer3D.setSize(container.clientWidth, container.clientHeight - controlBarHeight);
@@ -117,13 +117,14 @@ class CNCViewer {
     }
 
     render2D() {
+        console.log('Rendering 2D grid'); // Debug
         this.ctx2D.clearRect(0, 0, this.canvas2D.width, this.canvas2D.height);
         const scale = Math.min(this.canvas2D.width, this.canvas2D.height) / 100;
         const offsetX = this.canvas2D.width / 2;
         const offsetY = this.canvas2D.height / 2;
 
-        // Enhanced 2D grid
-        this.ctx2D.strokeStyle = '#666666'; // Darker gray for visibility
+        // 2D Grid
+        this.ctx2D.strokeStyle = '#666666';
         this.ctx2D.lineWidth = 0.8;
         for (let i = -50; i <= 50; i += 5) {
             this.ctx2D.beginPath();
@@ -136,9 +137,9 @@ class CNCViewer {
             this.ctx2D.stroke();
         }
 
-        // Highlight origin axes
+        // Origin axes
         this.ctx2D.strokeStyle = '#0000ff'; // X-axis
-        this.ctx2D.lineWidth = 1.5;
+        this.ctx2D.lineWidth = 2; // Thicker for visibility
         this.ctx2D.beginPath();
         this.ctx2D.moveTo(0 * scale + offsetX, -50 * scale + offsetY);
         this.ctx2D.lineTo(0 * scale + offsetX, 50 * scale + offsetY);
@@ -217,7 +218,12 @@ class CNCViewer {
         this.is2DView = !this.is2DView;
         this.canvas2D.style.display = this.is2DView ? 'block' : 'none';
         this.canvas3D.style.display = this.is2DView ? 'none' : 'block';
-        if (this.is2DView) this.render2D();
+        if (this.is2DView) {
+            this.render2D();
+            console.log('Switched to 2D view, grid should be visible');
+        } else {
+            console.log('Switched to 3D view, grid should be visible');
+        }
     }
 
     toggleMaterial() {
