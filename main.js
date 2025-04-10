@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctrlRewind = document.getElementById('ctrl-rewind');
     const ctrlPlayReverse = document.getElementById('ctrl-play-reverse');
     const ctrlStop = document.getElementById('ctrl-stop');
+    const ctrlPlayStart = document.getElementById('ctrl-play-start'); // New play button
     const ctrlPlay = document.getElementById('ctrl-play');
     const ctrlFwd = document.getElementById('ctrl-fwd');
     const ctrlFastFwd = document.getElementById('ctrl-fastfwd');
@@ -132,6 +133,10 @@ document.addEventListener('DOMContentLoaded', () => {
         viewer.stopSimulation();
     });
 
+    ctrlPlayStart.addEventListener('click', () => {
+        viewer.startSimulation(1); // Dedicated play button always starts forward
+    });
+
     ctrlPlay.addEventListener('click', () => {
         if (viewer.animating && viewer.animationData?.direction > 0) {
             viewer.stopSimulation();
@@ -173,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     settingsPlotBtn.addEventListener('click', () => {
-        alert('Settings functionality not implemented yet.');
+        alert('Settings functionality not implemented yet.'); // Placeholder for future settings
     });
 
     vcHomeBtn.addEventListener('click', () => {
@@ -204,10 +209,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     redoBtn.addEventListener('click', () => {
-        alert('Redo functionality not implemented yet.');
+        viewer.redo();
     });
 
     undoBtn.addEventListener('click', () => {
-        alert('Undo functionality not implemented yet.');
+        viewer.undo();
     });
 });
