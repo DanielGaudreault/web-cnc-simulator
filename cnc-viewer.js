@@ -19,6 +19,8 @@ class CNCViewer {
             canvas: document.getElementById('viewcube-canvas'), 
             antialias: true 
         });
+        this.history = []; // For undo/redo
+        this.redoStack = [];
         this.init();
         this.initViewcube();
     }
@@ -38,7 +40,6 @@ class CNCViewer {
         light.position.set(1, 1, 1);
         this.scene.add(light);
 
-        // Add colored axis lines instead of GridHelper
         const gridSize = 100;
 
         // X-axis (Blue)
@@ -46,7 +47,7 @@ class CNCViewer {
             new THREE.Vector3(-gridSize / 2, 0, 0),
             new THREE.Vector3(gridSize / 2, 0, 0)
         ]);
-        const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff }); // Blue
+        const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
         const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
         xAxis.position.set(0, 0, -0.1);
         this.scene.add(xAxis);
@@ -56,7 +57,7 @@ class CNCViewer {
             new THREE.Vector3(0, -gridSize / 2, 0),
             new THREE.Vector3(0, gridSize / 2, 0)
         ]);
-        const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 }); // Green
+        const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
         const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
         yAxis.position.set(0, 0, -0.1);
         this.scene.add(yAxis);
@@ -66,7 +67,7 @@ class CNCViewer {
             new THREE.Vector3(0, 0, -gridSize / 2),
             new THREE.Vector3(0, 0, gridSize / 2)
         ]);
-        const zAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 }); // Red
+        const zAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
         const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
         this.scene.add(zAxis);
 
@@ -79,7 +80,7 @@ class CNCViewer {
         this.viewcubeCamera.position.set(2, 2, 2);
         this.viewcubeCamera.lookAt(0, 0, 0);
 
-        const geometry = new THREE.BoxGeometry(1, 1, 1); // Placeholder for Rhombicuboctahedron
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
         const material = new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true });
         const rhombicuboctahedron = new THREE.Mesh(geometry, material);
         this.viewcubeScene.add(rhombicuboctahedron);
@@ -98,11 +99,14 @@ class CNCViewer {
     }
 
     loadToolpaths(toolpaths) {
+        this.history.push(JSON.stringify(this.toolpaths));
+        this.redoStack = [];
         this.toolpaths = toolpaths;
         this.showMaterial = true;
         this.render2D();
         this.render3D();
         this.loadMaterial();
+        this.updateButtonStates();
     }
 
     render2D() {
@@ -282,7 +286,10 @@ class CNCViewer {
     }
 
     exportToSTL() {
-        if (!this.materialMesh) return;
+        if (!this.materialMesh) {
+            alert('No material to export. Load a toolpath first.');
+            return;
+        }
         const exporter = new THREE.STLExporter();
         const stlString = exporter.parse(this.materialMesh);
         const blob = new Blob([stlString], { type: 'text/plain' });
@@ -316,6 +323,8 @@ class CNCViewer {
     }
 
     clearPlot() {
+        this.history.push(JSON.stringify(this.toolpaths));
+        this.redoStack = [];
         this.toolpaths = [];
         this.stopSimulation();
         this.ctx2D.clearRect(0, 0, this.canvas2D.width, this.canvas2D.height);
@@ -326,6 +335,32 @@ class CNCViewer {
         }
         this.updateInfo(null, { toolpaths: [], units: 'N/A' });
         document.getElementById('current-tool').textContent = 'N/A';
+        this.updateButtonStates();
+    }
+
+    undo() {
+        if (this.history.length === 0) return;
+        this.redoStack.push(JSON.stringify(this.toolpaths));
+        this.toolpaths = JSON.parse(this.history.pop());
+        this.render2D();
+        this.render3D();
+        this.loadMaterial();
+        this.updateButtonStates();
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+        this.history.push(JSON.stringify(this.toolpaths));
+        this.toolpaths = JSON.parse(this.redoStack.pop());
+        this.render2D();
+        this.render3D();
+        this.loadMaterial();
+        this.updateButtonStates();
+    }
+
+    updateButtonStates() {
+        document.getElementById('undo-btn').classList.toggle('disabled', this.history.length === 0);
+        document.getElementById('redo-btn').classList.toggle('disabled', this.redoStack.length === 0);
     }
 
     updateInfo(file, data) {
