@@ -30,15 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearPlotBtn = document.getElementById('clear-plot');
     const settingsPlotBtn = document.getElementById('settings-plot');
     const vcHomeBtn = document.getElementById('vc-home');
-    const vcTopBtn = document.getElementById('vc-top');
-    const vcFrontBtn = document.getElementById('vc-front');
-    const vcRightBtn = document.getElementById('vc-right');
     const saveBtn = document.getElementById('save-btn');
+    const openFileBtn = document.getElementById('open-file-btn');
     const sampleCircleBtn = document.getElementById('sample-circle-btn');
     const sampleSquareBtn = document.getElementById('sample-square-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    const undoBtn = document.getElementById('undo-btn');
     const loadingOverlay = document.getElementById('loading-overlay');
 
-    // Sample G-code definitions
     const sampleCircleGcode = `
         G21 ; Set units to millimeters
         G90 ; Absolute positioning
@@ -63,7 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     uploadButton.addEventListener('click', () => {
-        console.log('Upload button clicked');
+        fileInput.click();
+    });
+
+    openFileBtn.addEventListener('click', () => {
         fileInput.click();
     });
 
@@ -74,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = () => {
             const buffer = reader.result;
             const format = detectFileFormat(buffer, file.name);
-            console.log('Detected format:', format);
 
             if (format === 'MCAM') {
                 const parser = new McamParser(buffer);
@@ -108,14 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file) {
-            console.log('File selected:', file.name);
-            loadFile(file);
-        }
-    });
-
-    gcodeInput.addEventListener('change', () => {
-        // Removed automatic plotting on change to rely on explicit "Plot" button
+        if (file) loadFile(file);
     });
 
     viewToggleBtn.addEventListener('click', () => {
@@ -132,10 +126,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     ctrlPlayReverse.addEventListener('click', () => {
-        if (viewer.animating && viewer.animationData.direction < 0) {
+        if (viewer.animating && viewer.animationData?.direction < 0) {
             viewer.stopSimulation();
         } else {
-            viewer.stopSimulation();
             viewer.startSimulation(-1);
         }
     });
@@ -145,10 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     ctrlPlay.addEventListener('click', () => {
-        if (viewer.animating && viewer.animationData.direction > 0) {
+        if (viewer.animating && viewer.animationData?.direction > 0) {
             viewer.stopSimulation();
         } else {
-            viewer.stopSimulation();
             viewer.startSimulation(1);
         }
     });
@@ -165,11 +157,12 @@ document.addEventListener('DOMContentLoaded', () => {
         viewer.setSpeed(e.target.value);
     });
 
-    resetViewBtn.addEventListener('click', () => viewer.resetView());
+    resetViewBtn.addEventListener('click', () => {
+        viewer.resetView();
+    });
 
     toggleMaterialBtn.addEventListener('click', () => {
         viewer.toggleMaterial();
-        toggleMaterialBtn.classList.toggle('active');
     });
 
     exportBtn.addEventListener('click', () => {
@@ -182,22 +175,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearPlotBtn.addEventListener('click', () => {
         viewer.clearPlot();
-        gcodeInput.value = '';
     });
 
     settingsPlotBtn.addEventListener('click', () => {
-        alert('G-code editor settings are not yet implemented. Coming soon!');
-        // Placeholder for future settings modal
+        alert('Settings functionality not implemented yet.');
     });
 
-    vcHomeBtn.addEventListener('click', (e) => {
-        e.preventDefault();
+    vcHomeBtn.addEventListener('click', () => {
         viewer.setView('home');
     });
-
-    vcTopBtn.addEventListener('click', () => viewer.setView('top'));
-    vcFrontBtn.addEventListener('click', () => viewer.setView('front'));
-    vcRightBtn.addEventListener('click', () => viewer.setView('right'));
 
     saveBtn.addEventListener('click', () => {
         const gcodeText = gcodeInput.value;
@@ -208,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const blob = new Blob([gcodeText], { type: 'text/plain' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'cnc_program.gcode';
+        link.download = 'gcode.nc';
         link.click();
     });
 
@@ -222,5 +208,11 @@ document.addEventListener('DOMContentLoaded', () => {
         viewer.plotGcode();
     });
 
-    gcodeInput.value = '';
+    redoBtn.addEventListener('click', () => {
+        alert('Redo functionality not implemented yet.');
+    });
+
+    undoBtn.addEventListener('click', () => {
+        alert('Undo functionality not implemented yet.');
+    });
 });
