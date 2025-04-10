@@ -38,9 +38,37 @@ class CNCViewer {
         light.position.set(1, 1, 1);
         this.scene.add(light);
 
-        const grid = new THREE.GridHelper(100, 100, 0x888888, 0x888888);
-        grid.position.set(0, 0, -0.1);
-        this.scene.add(grid);
+        // Add colored axis lines instead of GridHelper
+        const gridSize = 100;
+
+        // X-axis (Blue)
+        const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-gridSize / 2, 0, 0),
+            new THREE.Vector3(gridSize / 2, 0, 0)
+        ]);
+        const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff }); // Blue
+        const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
+        xAxis.position.set(0, 0, -0.1);
+        this.scene.add(xAxis);
+
+        // Y-axis (Green)
+        const yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -gridSize / 2, 0),
+            new THREE.Vector3(0, gridSize / 2, 0)
+        ]);
+        const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 }); // Green
+        const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
+        yAxis.position.set(0, 0, -0.1);
+        this.scene.add(yAxis);
+
+        // Z-axis (Red)
+        const zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, -gridSize / 2),
+            new THREE.Vector3(0, 0, gridSize / 2)
+        ]);
+        const zAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 }); // Red
+        const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial);
+        this.scene.add(zAxis);
 
         this.animate();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -51,8 +79,7 @@ class CNCViewer {
         this.viewcubeCamera.position.set(2, 2, 2);
         this.viewcubeCamera.lookAt(0, 0, 0);
 
-        // Simplified Rhombicuboctahedron geometry
-        const geometry = new THREE.BoxGeometry(1, 1, 1); // Placeholder for simplicity
+        const geometry = new THREE.BoxGeometry(1, 1, 1); // Placeholder for Rhombicuboctahedron
         const material = new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true });
         const rhombicuboctahedron = new THREE.Mesh(geometry, material);
         this.viewcubeScene.add(rhombicuboctahedron);
@@ -220,7 +247,7 @@ class CNCViewer {
         document.getElementById('ctrl-play-reverse').classList.remove('active');
         this.togglePlayPause('ctrl-play', false);
         this.togglePlayPause('ctrl-play-reverse', false);
-        this.render3D(); // Reset view after stopping
+        this.render3D();
     }
 
     skipBackward(steps = 1) {
