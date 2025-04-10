@@ -51,25 +51,8 @@ class CNCViewer {
         this.viewcubeCamera.position.set(2, 2, 2);
         this.viewcubeCamera.lookAt(0, 0, 0);
 
-        // Rhombicuboctahedron geometry
-        const vertices = [
-            // Square faces (8 vertices per face, but shared)
-            1, 1, 0, -1, 1, 0, -1, -1, 0, 1, -1, 0, // Top square
-            1, 0, 1, -1, 0, 1, -1, 0, -1, 1, 0, -1, // Middle squares
-            0, 1, 1, 0, -1, 1, 0, -1, -1, 0, 1, -1,
-            1, 1, 0, 1, -1, 0, 1, -1, -1, 1, 1, -1 // Adjusted for connectivity
-        ].map(v => v * 0.7); // Scale down to fit viewcube
-
-        const faces = [
-            // Square faces
-            0, 1, 2, 3,  // Top
-            4, 5, 6, 7,  // Front
-            8, 9, 10, 11, // Right
-            // Triangle faces (simplified for demo)
-            0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11
-        ];
-
-        const geometry = new THREE.PolyhedronGeometry(vertices, faces, 0.7, 0);
+        // Simplified Rhombicuboctahedron geometry
+        const geometry = new THREE.BoxGeometry(1, 1, 1); // Placeholder for simplicity
         const material = new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true });
         const rhombicuboctahedron = new THREE.Mesh(geometry, material);
         this.viewcubeScene.add(rhombicuboctahedron);
@@ -203,56 +186,41 @@ class CNCViewer {
 
     setView(view) {
         if (this.is2DView) return;
-        const distance = 75;
-        switch (view) {
-            case 'top':
-                this.camera3D.position.set(0, distance, 0);
-                this.viewcubeCamera.position.set(0, 2, 0);
-                break;
-            case 'front':
-                this.camera3D.position.set(0, 0, distance);
-                this.viewcubeCamera.position.set(0, 0, 2);
-                break;
-            case 'right':
-                this.camera3D.position.set(distance, 0, 0);
-                this.viewcubeCamera.position.set(2, 0, 0);
-                break;
-            case 'home':
-                this.camera3D.position.set(50, 50, 50);
-                this.viewcubeCamera.position.set(2, 2, 2);
-                break;
+        if (view === 'home') {
+            this.camera3D.position.set(50, 50, 50);
+            this.viewcubeCamera.position.set(2, 2, 2);
+            this.controls.target.set(0, 0, 0);
+            this.controls.update();
+            this.viewcubeCamera.lookAt(0, 0, 0);
         }
-        this.controls.target.set(0, 0, 0);
-        this.controls.update();
-        this.viewcubeCamera.lookAt(0, 0, 0);
     }
 
     startSimulation(direction = 1) {
         if (!this.toolpaths.length) return;
+        if (this.animating) this.stopSimulation();
         this.animating = true;
-        if (!this.animationData) {
-            this.animationData = { 
-                currentPath: direction > 0 ? 0 : this.toolpaths.length - 1, 
-                currentPoint: direction > 0 ? 0 : this.toolpaths[direction > 0 ? 0 : this.toolpaths.length - 1].points.length - 1, 
-                speed: 0.05,
-                direction
-            };
-        } else {
-            this.animationData.direction = direction;
-        }
+        this.animationData = { 
+            currentPath: direction > 0 ? 0 : this.toolpaths.length - 1, 
+            currentPoint: direction > 0 ? 0 : this.toolpaths[this.toolpaths.length - 1].points.length - 1, 
+            speed: 0.05,
+            direction
+        };
         document.getElementById(direction > 0 ? 'ctrl-play' : 'ctrl-play-reverse').classList.add('active');
         this.togglePlayPause(direction > 0 ? 'ctrl-play' : 'ctrl-play-reverse', true);
+        this.animateSimulation();
     }
 
     stopSimulation() {
         this.animating = false;
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
         }
         document.getElementById('ctrl-play').classList.remove('active');
         document.getElementById('ctrl-play-reverse').classList.remove('active');
         this.togglePlayPause('ctrl-play', false);
         this.togglePlayPause('ctrl-play-reverse', false);
+        this.render3D(); // Reset view after stopping
     }
 
     skipBackward(steps = 1) {
@@ -370,7 +338,7 @@ class CNCViewer {
         
         if (pointIndex >= path.points.length || pointIndex < 0) {
             this.animationData.currentPath += direction;
-            this.animationData.currentPoint = direction > 0 ? 0 : path.points.length - 1;
+            this.animationData.currentPoint = direction > 0 ? 0 : (this.toolpaths[currentPath + direction]?.points.length - 1 || 0);
             return;
         }
 
@@ -402,9 +370,14 @@ class CNCViewer {
         this.animationData.currentPoint += speed * direction;
     }
 
-    animate() {
-        this.animationFrameId = requestAnimationFrame(() => this.animate());
+    animateSimulation() {
+        if (!this.animating) return;
         this.updateSimulation();
+        this.animationFrameId = requestAnimationFrame(() => this.animateSimulation());
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
         if (!this.is2DView) {
             this.controls.update();
             this.renderer3D.render(this.scene, this.camera3D);
