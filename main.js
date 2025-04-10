@@ -11,7 +11,6 @@ function detectFileFormat(buffer, fileName) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const viewer = new CNCViewer();
-    const uploadButton = document.getElementById('upload-button');
     const fileInput = document.getElementById('file-input');
     const gcodeInput = document.getElementById('gcode-input');
     const viewToggleBtn = document.getElementById('view-toggle');
@@ -60,10 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         G1 X-10 Y-10
         G0 Z5 ; Raise tool
     `;
-
-    uploadButton.addEventListener('click', () => {
-        fileInput.click();
-    });
 
     openFileBtn.addEventListener('click', () => {
         fileInput.click();
