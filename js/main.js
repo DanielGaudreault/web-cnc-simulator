@@ -461,3 +461,218 @@ class WebCNCApp {
             
         } catch (error) {
             this.showError('Export Error', error.message);
+        }
+    }
+
+    formatGCode() {
+        const editor = document.getElementById('gcodeEditor');
+        if (!editor) return;
+
+        // Basic formatting logic
+        const lines = editor.value.split('\n');
+        const formatted = lines.map(line => {
+            return line.trim().replace(/\s+/g, ' ');
+        }).filter(line => line.length > 0).join('\n');
+        
+        editor.value = formatted;
+        this.showNotification('G-code formatted', 'info');
+    }
+
+    validateGCode() {
+        const editor = document.getElementById('gcodeEditor');
+        if (!editor) return;
+
+        const parser = new GCodeParser();
+        const commands = parser.parse(editor.value);
+        const validation = parser.validate(commands);
+
+        if (validation.isValid) {
+            this.showNotification('G-code validation passed', 'success');
+        } else {
+            this.showError('G-code Validation Errors', 
+                validation.errors.join('\n'));
+        }
+    }
+
+    optimizeGCode() {
+        const editor = document.getElementById('gcodeEditor');
+        if (!editor) return;
+
+        const parser = new GCodeParser();
+        const commands = parser.parse(editor.value);
+        const optimized = parser.optimize(commands);
+        
+        editor.value = parser.formatGCodeForExport(optimized);
+        this.showNotification('G-code optimized', 'success');
+    }
+
+    // UI update methods
+    updateUI() {
+        this.updateOperationsUI();
+        this.updateToolsUI();
+        this.updateProjectInfo();
+    }
+
+    updateOperationsUI() {
+        const container = document.getElementById('operationsList');
+        if (!container) return;
+
+        const operations = this.operationManager.getAllOperations();
+        
+        container.innerHTML = operations.map(op => `
+            <div class="operation-item ${op.id === this.operationManager.currentOperation ? 'active' : ''}" 
+                 onclick="app.selectOperation('${op.id}')">
+                <div class="operation-icon ${op.type}">${op.icon}</div>
+                <div class="operation-info">
+                    <div class="operation-name">${op.name}</div>
+                    <div class="operation-type">${op.type}</div>
+                </div>
+                <div class="operation-actions">
+                    <button class="icon-btn" onclick="app.generateToolpath('${op.id}')" title="Generate Toolpath">⚡</button>
+                    <button class="icon-btn" onclick="app.deleteOperation('${op.id}')" title="Delete">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    updateToolsUI() {
+        const container = document.getElementById('toolList');
+        if (!container) return;
+
+        const tools = this.toolManager.getAllTools();
+        
+        container.innerHTML = tools.map(tool => `
+            <div class="tool-item" onclick="app.selectTool(${tool.id})">
+                <div class="tool-icon"></div>
+                <div class="tool-info">
+                    <div class="tool-name">T${tool.id} - ${tool.description}</div>
+                    <div class="tool-specs">Ø${tool.diameter}mm ${tool.type}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    updateProjectInfo() {
+        if (!this.currentProject) return;
+
+        document.title = `${this.currentProject.name} - WebCNC Pro`;
+        
+        const infoElement = document.getElementById('projectInfo');
+        if (infoElement) {
+            infoElement.textContent = `${this.currentProject.name} - ${this.currentProject.operations.length} operations`;
+        }
+    }
+
+    // Utility methods
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-header">
+                <span class="notification-title">${type.toUpperCase()}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+            </div>
+            <div class="notification-message">${message}</div>
+        `;
+
+        const container = document.getElementById('notificationContainer') || this.createNotificationContainer();
+        container.appendChild(notification);
+
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
+    createNotificationContainer() {
+        const container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+        return container;
+    }
+
+    showError(title, message) {
+        this.showNotification(`${title}: ${message}`, 'error');
+    }
+
+    setView(viewType) {
+        this.viewportManager.setView('main', viewType);
+    }
+
+    onWindowResize() {
+        if (this.viewportManager) {
+            this.viewportManager.onWindowResize();
+        }
+    }
+
+    onBeforeUnload(event) {
+        if (this.hasUnsavedChanges()) {
+            event.preventDefault();
+            event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+            return event.returnValue;
+        }
+    }
+
+    hasUnsavedChanges() {
+        // Implement logic to check for unsaved changes
+        return false;
+    }
+
+    // Public methods for UI callbacks
+    selectOperation(operationId) {
+        this.operationManager.currentOperation = operationId;
+        this.updateOperationsUI();
+    }
+
+    selectTool(toolId) {
+        // Implementation for tool selection
+    }
+
+    generateToolpath(operationId) {
+        this.operationManager.generateToolpath(operationId);
+    }
+
+    deleteOperation(operationId) {
+        if (confirm('Are you sure you want to delete this operation?')) {
+            this.operationManager.deleteOperation(operationId);
+            this.updateOperationsUI();
+        }
+    }
+
+    closeDialog(button) {
+        const dialog = button.closest('.modal');
+        if (dialog) {
+            dialog.remove();
+        }
+    }
+
+    // Additional dialog methods
+    showToolLibrary() {
+        // Implementation for tool library dialog
+    }
+
+    showMachineSetup() {
+        // Implementation for machine setup dialog
+    }
+
+    showPostProcessorDialog() {
+        // Implementation for post processor dialog
+    }
+
+    showSimulationReport(report) {
+        // Implementation for simulation report dialog
+    }
+}
+
+// Global app instance
+let app;
+
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    app = new WebCNCApp();
+});
+
+// Make app globally available for HTML event handlers
+window.app = app;
