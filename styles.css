@@ -1,1 +1,369 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #1e1e1e;
+    color: #fff;
+    overflow: hidden;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 300px 1fr 300px;
+    grid-template-rows: 60px 1fr 200px;
+    height: 100vh;
+    gap: 1px;
+    background: #333;
+}
+
+.header {
+    grid-column: 1 / -1;
+    background: #2d2d2d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid #444;
+}
+
+.logo {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.header-controls button {
+    background: #2196F3;
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.header-controls button:hover {
+    background: #1976D2;
+}
+
+.sidebar {
+    background: #252526;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.viewer {
+    background: #1e1e1e;
+    position: relative;
+}
+
+.tools-panel {
+    background: #252526;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.gcode-panel {
+    grid-column: 1 / -1;
+    background: #1e1e1e;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    background: #2d2d2d;
+    padding: 10px 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.editor-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.editor-controls button {
+    background: #666;
+    border: none;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+.editor-controls button:hover {
+    background: #888;
+}
+
+.gcode-editor {
+    flex: 1;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: none;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.4;
+}
+
+.control-group {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #2d2d2d;
+    border-radius: 5px;
+    border: 1px solid #444;
+}
+
+.control-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    color: #ccc;
+    font-weight: bold;
+}
+
+input, select, button {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    background: #3c3c3c;
+    border: 1px solid #555;
+    color: #fff;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+button {
+    background: #4CAF50;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #45a049;
+}
+
+.play-btn {
+    background: #4CAF50 !important;
+}
+
+.play-btn:hover {
+    background: #45a049 !important;
+}
+
+.pause-btn {
+    background: #ff9800 !important;
+}
+
+.pause-btn:hover {
+    background: #f57c00 !important;
+}
+
+.stop-btn {
+    background: #f44336 !important;
+}
+
+.stop-btn:hover {
+    background: #d32f2f !important;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.control-buttons button {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+#viewport {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+}
+
+#viewport:active {
+    cursor: grabbing;
+}
+
+.coordinates {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.8);
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+    border: 1px solid #444;
+}
+
+.simulation-info {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.8);
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    border: 1px solid #444;
+}
+
+/* 3D Axes Controller */
+.axes-controller {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.8);
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #444;
+    width: 150px;
+    height: 180px;
+    backdrop-filter: blur(5px);
+}
+
+.axes-label {
+    font-size: 0.8em;
+    color: #ccc;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+#axesViewport {
+    width: 130px;
+    height: 130px;
+    display: block;
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #444;
+    border-radius: 3px;
+}
+
+.axes-instructions {
+    font-size: 0.7em;
+    color: #888;
+    text-align: center;
+    margin-top: 5px;
+    line-height: 1.2;
+}
+
+/* Stats and Info Panels */
+#stats, #machineState {
+    font-size: 0.85em;
+    line-height: 1.6;
+}
+
+#stats div, #machineState div {
+    padding: 2px 0;
+    border-bottom: 1px solid #333;
+}
+
+#currentOp {
+    background: #333;
+    padding: 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+    min-height: 40px;
+    border: 1px solid #444;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .container {
+        grid-template-columns: 250px 1fr 250px;
+    }
+    
+    .axes-controller {
+        width: 130px;
+        height: 160px;
+    }
+    
+    #axesViewport {
+        width: 110px;
+        height: 110px;
+    }
+}
+
+/* Animation for simulation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.simulating {
+    animation: pulse 1s infinite;
+}
+
+/* G-code syntax highlighting in editor */
+.gcode-editor {
+    tab-size: 4;
+}
+
+.gcode-editor::selection {
+    background: #264f78;
+}
+
+/* Tooltip styles */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    z-index: 1000;
+}
