@@ -3,172 +3,766 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate CNC Viewer (Haas & Okuma Genos)</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>WebCNC Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            grid-template-rows: 60px 1fr 200px;
+            height: 100vh;
+            gap: 1px;
+            background: #333;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            background: #2d2d2d;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid #444;
+        }
+
+        .logo {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .sidebar {
+            background: #252526;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .viewer {
+            background: #1e1e1e;
+            position: relative;
+        }
+
+        .tools-panel {
+            background: #252526;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .gcode-panel {
+            grid-column: 1 / -1;
+            background: #1e1e1e;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            background: #2d2d2d;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+        }
+
+        .gcode-editor {
+            flex: 1;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 3px;
+        }
+
+        button {
+            background: #4CAF50;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .tool-button {
+            background: #2196F3;
+            margin: 2px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .control-buttons button {
+            flex: 1;
+        }
+
+        #viewport {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .coordinates {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .simulation-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            border-radius: 3px;
+        }
+    </style>
 </head>
 <body>
-    <div id="viewer-container">
-        <input type="file" id="file-input" accept=".gcode,.mcam,.nc,.tap" />
-
-        <div id="top-toolbar">
-            <button id="save-btn" class="tool-button" data-tooltip="Save G-code">
-                <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="save" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="svg-inline--fa fa-save fa-w-14">
-                    <path fill="currentColor" d="M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"></path>
-                </svg>
-            </button>
-            <button id="open-file-btn" class="tool-button" data-tooltip="Open File">
-                <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="folder-open" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" class="svg-inline--fa fa-folder-open fa-w-18 fa-fw">
-                    <path fill="currentColor" d="M572.694 292.093L500.27 416.248A63.997 63.997 0 0 1 444.989 448H45.025c-18.523 0-30.064-20.093-20.731-36.093l72.424-124.155A64 64 0 0 1 152 256h399.964c18.523 0 30.064 20.093 20.73 36.093zM152 224h328v-48c0-26.51-21.49-48-48-48H272l-64-64H48C21.49 64 0 85.49 0 112v278.046l69.077-118.418C86.214 242.25 117.989 224 152 224z"></path>
-                </svg>
-            </button>
-            <button id="sample-circle-btn" class="tool-button" data-tooltip="Load Circle Sample">
-                <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="download" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-download fa-w-16 fa-fw">
-                    <path fill="currentColor" d="M216 0h80c13.3 0 24 10.7 24 24v168h87.7c17.8 0 26.7 21.5 14.1 34.1L269.7 378.3c-7.5 7.5-19.8 7.5-27.3 0L90.1 226.1c-12.6-12.6-3.7-34.1 14.1-34.1H192V24c0-13.3 10.7-24 24-24zm296 376v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h146.7l49 49c20.1 20.1 52.5 20.1 72.6 0l49-49H488c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z"></path>
-                </svg>
-                Circle
-            </button>
-            <button id="sample-square-btn" class="tool-button" data-tooltip="Load Square Sample">
-                <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="download" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-download fa-w-16 fa-fw">
-                    <path fill="currentColor" d="M216 0h80c13.3 0 24 10.7 24 24v168h87.7c17.8 0 26.7 21.5 14.1 34.1L269.7 378.3c-7.5 7.5-19.8 7.5-27.3 0L90.1 226.1c-12.6-12.6-3.7-34.1 14.1-34.1H192V24c0-13.3 10.7-24 24-24zm296 376v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h146.7l49 49c20.1 20.1 52.5 20.1 72.6 0l49-49H488c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z"></path>
-                </svg>
-                Square
-            </button>
-            <button id="redo-btn" class="tool-button disabled" data-tooltip="Redo">
-                <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="share" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-share fa-w-16">
-                    <path fill="currentColor" d="M503.691 189.836L327.687 37.851C312.281 24.546 288 35.347 288 56.015v80.053C127.371 137.907 0 170.1 0 322.326c0 61.441 39.581 122.309 83.333 154.132 13.653 9.931 33.111-2.533 28.077-18.631C66.066 312.814 132.917 274.316 288 272.085V360c0 20.7 24.3 31.453 39.687 18.164l176.004-152c11.071-9.562 11.086-26.753 0-36.328z"></path>
-                </svg>
-            </button>
-            <button id="undo-btn" class="tool-button disabled" data-tooltip="Undo">
-                <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="reply" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-reply fa-w-16">
-                    <path fill="currentColor" d="M8.309 189.836L184.313 37.851C199.719 24.546 224 35.347 224 56.015v80.053c160.629 1.839 288 34.032 288 186.258 0 61.441-39.581 122.309-83.333 154.132-13.653 9.931-33.111-2.533-28.077-18.631 45.344-145.012-21.507-183.51-176.59-185.742V360c0 20.7-24.3 31.453-39.687 18.164l-176.004-152c-11.071-9.562-11.086-26.753 0-36.328z"></path>
-                </svg>
-            </button>
+    <div class="container">
+        <div class="header">
+            <div class="logo">WebCNC Simulator</div>
         </div>
 
-        <div id="sidebar">
-            <h3>File Info</h3>
-            <div id="info-panel">
-                <div class="info-item"><span class="info-label">File Name:</span><span id="file-name">None</span></div>
-                <div class="info-item"><span class="info-label">File Size:</span><span id="file-size">0 KB</span></div>
-                <div class="info-item"><span class="info-label">Toolpaths:</span><span id="toolpath-count">0</span></div>
-                <div class="info-item"><span class="info-label">Bounds:</span><span id="bounds">N/A</span></div>
-                <div class="info-item"><span class="info-label">Units:</span><span id="units">N/A</span></div>
-                <div class="info-item"><span class="info-label">Current Tool:</span><span id="current-tool">N/A</span></div>
+        <div class="sidebar">
+            <div class="control-group">
+                <div class="control-label">Workpiece Setup</div>
+                <input type="number" id="workpieceWidth" placeholder="Width (mm)" value="100">
+                <input type="number" id="workpieceHeight" placeholder="Height (mm)" value="100">
+                <input type="number" id="workpieceDepth" placeholder="Depth (mm)" value="20">
+                <button onclick="createWorkpiece()">Create Workpiece</button>
             </div>
-            <h3>G-Code Editor</h3>
-            <textarea id="gcode-input" placeholder="Paste or edit G-code here (MCAM may show limited data)..."></textarea>
-            <div id="plot-buttons" class="dropdown-buttons">
-                <button id="plot-file-btn" class="nc-btn mx-1">Plot</button>
-                <button id="clear-plot" class="nc-btn alt mx-1">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="ban" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-ban fa-w-16">
-                        <path fill="currentColor" d="M256 8C119.034 8 8 119.033 8 256s111.034 248 248 248 248-111.034 248-248S392.967 8 256 8zm130.108 117.892c65.448 65.448 70 165.481 20.677 235.637L150.47 105.216c70.204-49.356 170.226-44.735 235.638 20.676zM125.892 386.108c-65.448-65.448-70-165.481-20.677-235.637L361.53 406.784c-70.203 49.356-170.226 44.736-235.638-20.676z"></path>
-                    </svg>
-                </button>
-                <button id="settings-plot" aria-label="gcode editor options" class="nc-btn secondary mx-1">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="cog" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-cog fa-w-16">
-                        <path fill="currentColor" d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
-                    </svg>
-                </button>
+
+            <div class="control-group">
+                <div class="control-label">Tool Setup</div>
+                <select id="toolType">
+                    <option value="endmill">End Mill (6mm)</option>
+                    <option value="ballnose">Ball Nose (8mm)</option>
+                    <option value="drill">Drill (4mm)</option>
+                </select>
+                <input type="number" id="toolDiameter" placeholder="Tool Diameter (mm)" value="6">
+                <input type="number" id="feedRate" placeholder="Feed Rate (mm/min)" value="1000">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">Simulation Controls</div>
+                <div class="control-buttons">
+                    <button onclick="startSimulation()" style="background:#4CAF50">▶ Play</button>
+                    <button onclick="pauseSimulation()" style="background:#ff9800">⏸ Pause</button>
+                    <button onclick="resetSimulation()" style="background:#f44336">⏹ Stop</button>
+                </div>
+                <input type="range" id="simulationSpeed" min="1" max="10" value="5">
+                <div class="control-label">Speed: <span id="speedValue">5</span>x</div>
             </div>
         </div>
 
-        <div id="canvas-container">
-            <canvas id="canvas-2d"></canvas>
-            <canvas id="canvas-3d"></canvas>
+        <div class="viewer">
+            <canvas id="viewport"></canvas>
+            <div class="coordinates" id="coordinates">X: 0.00 Y: 0.00 Z: 0.00</div>
+            <div class="simulation-info" id="simulationInfo">Ready</div>
         </div>
 
-        <div class="toolbar">
-            <div class="toolbar-buttons">
-                <button class="tool-button" id="view-toggle" data-tooltip="Toggle 2D/3D">2D/3D</button>
-                <div class="speed-control">
-                    <label for="speed-slider" style="font-size: 12px;">Speed:</label>
-                    <input type="range" id="speed-slider" min="0.01" max="1" step="0.01" value="0.05">
-                </div>
-                <button class="tool-button" id="reset-view" data-tooltip="Reset View">Reset</button>
-                <button class="tool-button" id="toggle-material" data-tooltip="Show/Hide Material">Material</button>
-                <button class="tool-button" id="export-btn" data-tooltip="Export as STL">Export</button>
+        <div class="tools-panel">
+            <div class="control-group">
+                <div class="control-label">Quick G-code</div>
+                <button class="tool-button" onclick="generateSquarePocket()">Square Pocket</button>
+                <button class="tool-button" onclick="generateCircle()">Circle</button>
+                <button class="tool-button" onclick="generateGrid()">Grid Pattern</button>
+                <button class="tool-button" onclick="generateSpiral()">Spiral</button>
             </div>
-            <div id="viewcube">
-                <a id="vc-home">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="home" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" class="svg-inline--fa fa-home fa-w-18 fa-fw">
-                        <path fill="currentColor" d="M280.37 148.26L96 300.11V464a16 16 0 0 0 16 16l112.06-.29a16 16 0 0 0 15.92-16V368a16 16 0 0 1 16-16h64a16 16 0 0 1 16 16v95.64a16 16 0 0 0 16 16.05L464 480a16 16 0 0 0 16-16V300L295.67 148.26a12.19 12.19 0 0 0-15.3 0zM571.6 251.47L488 182.56V44.05a12 12 0 0 0-12-12h-56a12 12 0 0 0-12 12v72.61L318.47 43a48 48 0 0 0-61 0L4.34 251.47a12 12 0 0 0-1.6 16.9l25.5 31A12 12 0 0 0 45.15 301l235.22-193.74a12.19 12.19 0 0 1 15.3 0L530.9 301a12 12 0 0 0 16.9-1.6l25.5-31a12 12 0 0 0-1.7-16.93z"></path>
-                    </svg>
-                </a>
-                <span>Rhombicuboctahedron</span>
-                <canvas id="viewcube-canvas" width="100" height="100" style="width: 100px; height: 100px;"></canvas>
-            </div>
-        </div>
 
-        <div id="control-bar">
-            <div class="control-icons">
-                <div id="ctrl-fastrewind" class="icon">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="fast-backward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                        <path fill="currentColor" d="M0 436V76c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12v151.9L235.5 71.4C256.1 54.3 288 68.6 288 96v131.9L459.5 71.4C480.1 54.3 512 68.6 512 96v320c0 27.4-31.9 41.7-52.5 24.6L288 285.3V416c0 27.4-31.9 41.7-52.5 24.6L64 285.3V436c0 6.6-5.4 12-12 12H12c-6.6 0-12-5.4-12-12z"></path>
-                    </svg>
-                </div>
-                <div id="ctrl-rewind" class="icon">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="step-backward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
-                        <path fill="currentColor" d="M64 468V44c0-6.6 5.4-12 12-12h48c6.6 0 12 5.4 12 12v176.4l195.5-181C352.1 22.3 384 36.6 384 64v384c0 27.4-31.9 41.7-52.5 24.6L136 292.7V468c0 6.6-5.4 12-12 12H76c-6.6 0-12-5.4-12-12z"></path>
-                    </svg>
-                </div>
-                <div id="ctrl-play-reverse" class="icon">
-                    <div style="display:;">
-                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="play" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="play-btn-reverse">
-                            <path fill="currentColor" d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z" transform="scale(-1, 1) translate(-448, 0)"></path>
-                        </svg>
-                    </div>
-                    <div style="display:none;">
-                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="pause" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="pause-btn-reverse">
-                            <path fill="currentColor" d="M144 479H48c-26.5 0-48-21.5-48-48V79c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v352c0 26.5-21.5 48-48 48zm304-48V79c0-26.5-21.5-48-48-48h-96c-26.5 0-48 21.5-48 48v352c0 26.5 21.5 48 48 48h96c26.5 0 48-21.5 48-48z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div id="ctrl-stop" class="icon">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="stop" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
-                        <path fill="currentColor" d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48z"></path>
-                    </svg>
-                </div>
-                <div id="ctrl-play-start" class="icon">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="play" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
-                        <path fill="currentColor" d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path>
-                    </svg>
-                </div>
-                <div id="ctrl-play" class="icon">
-                    <div style="display:;">
-                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="play" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="play-btn">
-                            <path fill="currentColor" d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path>
-                        </svg>
-                    </div>
-                    <div style="display:none;">
-                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="pause" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" id="pause-btn">
-                            <path fill="currentColor" d="M144 479H48c-26.5 0-48-21.5-48-48V79c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v352c0 26.5-21.5 48-48 48zm304-48V79c0-26.5-21.5-48-48-48h-96c-26.5 0-48 21.5-48 48v352c0 26.5 21.5 48 48 48h96c26.5 0 48-21.5 48-48z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div id="ctrl-fwd" class="icon">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="step-forward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
-                        <path fill="currentColor" d="M384 44v424c0 6.6-5.4 12-12 12h-48c-6.6 0-12-5.4-12-12V291.6l-195.5 181C95.9 489.7 64 475.4 64 448V64c0-27.4 31.9-41.7 52.5-24.6L312 219.3V44c0-6.6 5.4-12 12-12h48c6.6 0 12 5.4 12 12z"></path>
-                    </svg>
-                </div>
-                <div id="ctrl-fastfwd" class="icon">
-                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="fast-forward" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                        <path fill="currentColor" d="M512 76v360c0 6.6-5.4 12-12 12h-40c-6.6 0-12-5.4-12-12V284.1L276.5 440.6c-20.6 17.2-52.5 2.8-52.5-24.6V284.1L52.5 440.6C31.9 457.8 0 443.4 0 416V96c0-27.4 31.9-41.7 52.5-24.6L224 226.8V96c0-27.4 31.9-41.7 52.5-24.6L448 226.8V76c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12z"></path>
-                    </svg>
+            <div class="control-group">
+                <div class="control-label">Visualization</div>
+                <button class="tool-button" onclick="toggleToolpath()">Toggle Toolpath</button>
+                <button class="tool-button" onclick="toggleWorkpiece()">Toggle Workpiece</button>
+                <button class="tool-button" onclick="resetView()">Reset View</button>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">Simulation Stats</div>
+                <div id="stats">
+                    <div>Time: 0:00</div>
+                    <div>Operations: 0</div>
+                    <div>Material Removed: 0%</div>
                 </div>
             </div>
         </div>
 
-        <div id="loading-overlay" class="loading-overlay">
-            <div class="loading-spinner"></div>
-            <div>Loading...</div>
+        <div class="gcode-panel">
+            <div class="panel-header">G-code Editor</div>
+            <textarea class="gcode-editor" id="gcodeEditor" spellcheck="false">
+G21 ; Millimeter units
+G90 ; Absolute positioning
+G17 ; XY plane selection
+
+; Square Pocket Example
+G0 Z5
+G0 X20 Y20
+G1 Z-2 F500
+G1 X80 F1000
+G1 Y80
+G1 X20
+G1 Y20
+G0 Z5
+
+; Circle Example
+G0 X50 Y50
+G1 Z-1 F500
+G2 X50 Y50 I10 J0 F800
+G0 Z5
+
+M30 ; Program end
+            </textarea>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/exporters/STLExporter.js"></script>
-    <script src="cnc-viewer.js"></script>
-    <script src="parsers.js"></script>
-    <script src="main.js"></script>
+    <script>
+        // Three.js CNC Simulator - Entirely Client Side
+        class CNCSimulator {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.workpiece = null;
+                this.tool = null;
+                this.toolPath = null;
+                this.isSimulating = false;
+                this.simulationSpeed = 5;
+                this.currentCommandIndex = 0;
+                this.gcodeCommands = [];
+                this.currentPosition = { x: 0, y: 0, z: 0 };
+                
+                this.init();
+            }
+
+            init() {
+                this.setupScene();
+                this.createWorkpiece(100, 100, 20);
+                this.createTool();
+                this.setupEventListeners();
+                this.animate();
+            }
+
+            setupScene() {
+                const canvas = document.getElementById('viewport');
+                
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x1e1e1e);
+
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+                this.camera.position.set(150, 150, 150);
+                this.camera.lookAt(0, 0, 0);
+
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+                this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                this.renderer.shadowMap.enabled = true;
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x404040);
+                this.scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                directionalLight.position.set(50, 50, 50);
+                directionalLight.castShadow = true;
+                this.scene.add(directionalLight);
+
+                // Grid Helper
+                const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+                this.scene.add(gridHelper);
+
+                // Axes Helper
+                const axesHelper = new THREE.AxesHelper(50);
+                this.scene.add(axesHelper);
+            }
+
+            createWorkpiece(width = 100, height = 100, depth = 20) {
+                if (this.workpiece) {
+                    this.scene.remove(this.workpiece);
+                }
+
+                const geometry = new THREE.BoxGeometry(width, height, depth);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: 0x888888,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                this.workpiece = new THREE.Mesh(geometry, material);
+                this.workpiece.position.y = depth / 2; // Sit on grid
+                this.scene.add(this.workpiece);
+
+                this.workpiece.userData = {
+                    originalGeometry: geometry.clone(),
+                    materialRemoved: false
+                };
+            }
+
+            createTool() {
+                if (this.tool) {
+                    this.scene.remove(this.tool);
+                }
+
+                const toolGeometry = new THREE.CylinderGeometry(3, 3, 20, 16);
+                const toolMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+                this.tool = new THREE.Mesh(toolGeometry, toolMaterial);
+                this.tool.visible = false;
+                this.scene.add(this.tool);
+            }
+
+            parseGCode(gcode) {
+                this.gcodeCommands = [];
+                const lines = gcode.split('\n');
+                
+                lines.forEach(line => {
+                    const command = this.parseLine(line.trim());
+                    if (command) {
+                        this.gcodeCommands.push(command);
+                    }
+                });
+                
+                this.visualizeToolpath();
+                return this.gcodeCommands;
+            }
+
+            parseLine(line) {
+                if (!line || line.startsWith(';')) return null;
+
+                // Simple G-code parser
+                const parts = line.split(';')[0].trim().split(/\s+/);
+                if (parts.length === 0) return null;
+
+                const command = { type: 'unknown', parameters: {} };
+
+                parts.forEach(part => {
+                    const code = part[0].toUpperCase();
+                    const value = parseFloat(part.substring(1));
+
+                    if (code === 'G' || code === 'M') {
+                        command.type = code + value;
+                    } else if ('XYZFIJKR'.includes(code)) {
+                        command.parameters[code] = value;
+                    }
+                });
+
+                return command;
+            }
+
+            visualizeToolpath() {
+                if (this.toolPath) {
+                    this.scene.remove(this.toolPath);
+                }
+
+                const points = [];
+                let currentPos = { x: 0, y: 0, z: 0 };
+
+                this.gcodeCommands.forEach(cmd => {
+                    if (cmd.type === 'G0' || cmd.type === 'G1') {
+                        const newPos = {
+                            x: cmd.parameters.X !== undefined ? cmd.parameters.X : currentPos.x,
+                            y: cmd.parameters.Y !== undefined ? cmd.parameters.Y : currentPos.y,
+                            z: cmd.parameters.Z !== undefined ? cmd.parameters.Z : currentPos.z
+                        };
+                        
+                        points.push(new THREE.Vector3(currentPos.x, currentPos.z, currentPos.y));
+                        points.push(new THREE.Vector3(newPos.x, newPos.z, newPos.y));
+                        
+                        currentPos = { ...newPos };
+                    }
+                });
+
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+                this.toolPath = new THREE.LineSegments(geometry, material);
+                this.scene.add(this.toolPath);
+            }
+
+            async startSimulation() {
+                if (this.isSimulating) return;
+                
+                this.isSimulating = true;
+                this.currentCommandIndex = 0;
+                this.currentPosition = { x: 0, y: 0, z: 0 };
+                this.tool.visible = true;
+
+                const gcode = document.getElementById('gcodeEditor').value;
+                this.parseGCode(gcode);
+
+                while (this.isSimulating && this.currentCommandIndex < this.gcodeCommands.length) {
+                    await this.executeCommand(this.gcodeCommands[this.currentCommandIndex]);
+                    this.currentCommandIndex++;
+                    
+                    // Add delay for visualization
+                    await new Promise(resolve => 
+                        setTimeout(resolve, 100 / this.simulationSpeed)
+                    );
+                }
+
+                this.isSimulating = false;
+                this.tool.visible = false;
+                document.getElementById('simulationInfo').textContent = 'Simulation Complete';
+            }
+
+            async executeCommand(command) {
+                document.getElementById('simulationInfo').textContent = 
+                    `Executing: ${command.type}`;
+
+                switch (command.type) {
+                    case 'G0': // Rapid move
+                    case 'G1': // Linear move
+                        await this.moveTool(command);
+                        break;
+                    case 'G2': // Circular move CW
+                    case 'G3': // Circular move CCW
+                        await this.circularMove(command);
+                        break;
+                    case 'G17': // XY plane selection
+                    case 'G21': // Millimeter units
+                    case 'G90': // Absolute positioning
+                        // These are handled by state, just continue
+                        break;
+                    case 'M30': // Program end
+                        this.isSimulating = false;
+                        break;
+                }
+
+                this.updateCoordinates();
+            }
+
+            async moveTool(command) {
+                const target = {
+                    x: command.parameters.X !== undefined ? command.parameters.X : this.currentPosition.x,
+                    y: command.parameters.Y !== undefined ? command.parameters.Y : this.currentPosition.y,
+                    z: command.parameters.Z !== undefined ? command.parameters.Z : this.currentPosition.z
+                };
+
+                const steps = 20;
+                for (let i = 0; i <= steps; i++) {
+                    if (!this.isSimulating) break;
+                    
+                    const t = i / steps;
+                    this.currentPosition.x = this.lerp(this.currentPosition.x, target.x, t);
+                    this.currentPosition.y = this.lerp(this.currentPosition.y, target.y, t);
+                    this.currentPosition.z = this.lerp(this.currentPosition.z, target.z, t);
+                    
+                    this.tool.position.set(
+                        this.currentPosition.x,
+                        this.currentPosition.z + 10, // Tool height offset
+                        this.currentPosition.y
+                    );
+
+                    // Simulate material removal for cutting moves
+                    if (command.type === 'G1' && this.currentPosition.z < 0) {
+                        this.simulateMaterialRemoval();
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+            }
+
+            async circularMove(command) {
+                // Simplified circular interpolation
+                const center = {
+                    x: this.currentPosition.x + (command.parameters.I || 0),
+                    y: this.currentPosition.y + (command.parameters.J || 0)
+                };
+                
+                const radius = Math.sqrt(
+                    Math.pow(command.parameters.I || 0, 2) + 
+                    Math.pow(command.parameters.J || 0, 2)
+                );
+
+                const startAngle = Math.atan2(
+                    this.currentPosition.y - center.y,
+                    this.currentPosition.x - center.x
+                );
+
+                const endAngle = startAngle + (command.type === 'G2' ? -Math.PI * 2 : Math.PI * 2);
+                const steps = 36;
+
+                for (let i = 0; i <= steps; i++) {
+                    if (!this.isSimulating) break;
+                    
+                    const angle = this.lerp(startAngle, endAngle, i / steps);
+                    this.currentPosition.x = center.x + Math.cos(angle) * radius;
+                    this.currentPosition.y = center.y + Math.sin(angle) * radius;
+                    
+                    this.tool.position.set(
+                        this.currentPosition.x,
+                        this.currentPosition.z + 10,
+                        this.currentPosition.y
+                    );
+
+                    if (this.currentPosition.z < 0) {
+                        this.simulateMaterialRemoval();
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+            }
+
+            simulateMaterialRemoval() {
+                // Simple material removal visualization
+                if (this.workpiece.userData.materialRemoved) return;
+                
+                this.workpiece.material.opacity = 0.6;
+                this.workpiece.material.color.setHex(0x666666);
+                this.workpiece.userData.materialRemoved = true;
+            }
+
+            lerp(start, end, factor) {
+                return start + (end - start) * factor;
+            }
+
+            updateCoordinates() {
+                const coords = document.getElementById('coordinates');
+                coords.textContent = 
+                    `X: ${this.currentPosition.x.toFixed(2)} Y: ${this.currentPosition.y.toFixed(2)} Z: ${this.currentPosition.z.toFixed(2)}`;
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.onWindowResize());
+                
+                // Simulation speed control
+                document.getElementById('simulationSpeed').addEventListener('input', (e) => {
+                    this.simulationSpeed = e.target.value;
+                    document.getElementById('speedValue').textContent = e.target.value;
+                });
+            }
+
+            onWindowResize() {
+                const canvas = document.getElementById('viewport');
+                this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            pauseSimulation() {
+                this.isSimulating = false;
+            }
+
+            resetSimulation() {
+                this.isSimulating = false;
+                this.currentCommandIndex = 0;
+                this.currentPosition = { x: 0, y: 0, z: 0 };
+                this.tool.visible = false;
+                
+                // Reset workpiece
+                if (this.workpiece) {
+                    this.workpiece.material.opacity = 0.8;
+                    this.workpiece.material.color.setHex(0x888888);
+                    this.workpiece.userData.materialRemoved = false;
+                }
+                
+                document.getElementById('simulationInfo').textContent = 'Ready';
+                this.updateCoordinates();
+            }
+        }
+
+        // Global simulator instance
+        let simulator;
+
+        // Initialize when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            // Load Three.js from CDN
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+            script.onload = () => {
+                simulator = new CNCSimulator();
+            };
+            document.head.appendChild(script);
+        });
+
+        // UI Control Functions
+        function createWorkpiece() {
+            const width = parseFloat(document.getElementById('workpieceWidth').value) || 100;
+            const height = parseFloat(document.getElementById('workpieceHeight').value) || 100;
+            const depth = parseFloat(document.getElementById('workpieceDepth').value) || 20;
+            
+            if (simulator) {
+                simulator.createWorkpiece(width, height, depth);
+            }
+        }
+
+        function startSimulation() {
+            if (simulator) {
+                simulator.startSimulation();
+            }
+        }
+
+        function pauseSimulation() {
+            if (simulator) {
+                simulator.pauseSimulation();
+            }
+        }
+
+        function resetSimulation() {
+            if (simulator) {
+                simulator.resetSimulation();
+            }
+        }
+
+        function toggleToolpath() {
+            if (simulator && simulator.toolPath) {
+                simulator.toolPath.visible = !simulator.toolPath.visible;
+            }
+        }
+
+        function toggleWorkpiece() {
+            if (simulator && simulator.workpiece) {
+                simulator.workpiece.visible = !simulator.workpiece.visible;
+            }
+        }
+
+        function resetView() {
+            if (simulator && simulator.camera) {
+                simulator.camera.position.set(150, 150, 150);
+                simulator.camera.lookAt(0, 0, 0);
+            }
+        }
+
+        // Example G-code generators
+        function generateSquarePocket() {
+            const gcode = `G21
+G90
+G17
+
+; Square Pocket
+G0 Z5
+G0 X25 Y25
+G1 Z-3 F500
+G1 X75 F1000
+G1 Y75
+G1 X25
+G1 Y25
+G0 Z5
+
+M30`;
+            document.getElementById('gcodeEditor').value = gcode;
+        }
+
+        function generateCircle() {
+            const gcode = `G21
+G90
+G17
+
+; Circle
+G0 Z5
+G0 X50 Y50
+G1 Z-2 F500
+G2 X50 Y50 I15 J0 F800
+G0 Z5
+
+M30`;
+            document.getElementById('gcodeEditor').value = gcode;
+        }
+
+        function generateGrid() {
+            const gcode = `G21
+G90
+G17
+
+; Grid Pattern
+G0 Z5
+G1 Z-1 F500
+
+; Horizontal lines
+G0 X20 Y20
+G1 X80 F1000
+G0 X20 Y40
+G1 X80
+G0 X20 Y60
+G1 X80
+G0 X20 Y80
+G1 X80
+
+; Vertical lines
+G0 X20 Y20
+G1 Y80
+G0 X40 Y20
+G1 Y80
+G0 X60 Y20
+G1 Y80
+G0 X80 Y20
+G1 Y80
+
+G0 Z5
+M30`;
+            document.getElementById('gcodeEditor').value = gcode;
+        }
+
+        function generateSpiral() {
+            const gcode = `G21
+G90
+G17
+
+; Spiral
+G0 Z5
+G0 X50 Y50
+G1 Z-2 F500
+
+; Spiral outwards
+G2 X50 Y50 I1 J0 F800
+G2 X50 Y50 I2 J0
+G2 X50 Y50 I3 J0
+G2 X50 Y50 I4 J0
+G2 X50 Y50 I5 J0
+G2 X50 Y50 I6 J0
+G2 X50 Y50 I7 J0
+G2 X50 Y50 I8 J0
+G2 X50 Y50 I9 J0
+G2 X50 Y50 I10 J0
+
+G0 Z5
+M30`;
+            document.getElementById('gcodeEditor').value = gcode;
+        }
+    </script>
 </body>
 </html>
