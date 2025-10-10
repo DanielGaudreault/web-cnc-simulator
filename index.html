@@ -11,9 +11,18 @@
         <div class="header">
             <div class="logo">WebCNC Simulator</div>
             <div class="header-controls">
-                <button onclick="loadGCodeExample('square')">Square Pocket</button>
+                <select id="templateSelector" onchange="loadTemplate(this.value)">
+                    <option value="">Select Template...</option>
+                    <option value="basic_grid">Basic Grid</option>
+                    <option value="pocketing">Pocketing Operations</option>
+                    <option value="contouring">Contouring</option>
+                    <option value="drilling">Drilling Pattern</option>
+                    <option value="engraving">Engraving</option>
+                    <option value="3d_surface">3D Surface</option>
+                </select>
+                <button onclick="loadGCodeExample('square')">Square</button>
                 <button onclick="loadGCodeExample('circle')">Circle</button>
-                <button onclick="loadGCodeExample('grid')">Grid Pattern</button>
+                <button onclick="loadGCodeExample('grid')">Grid</button>
                 <button onclick="loadGCodeExample('spiral')">Spiral</button>
             </div>
         </div>
@@ -33,9 +42,12 @@
                     <option value="endmill">End Mill (6mm)</option>
                     <option value="ballnose">Ball Nose (8mm)</option>
                     <option value="drill">Drill (4mm)</option>
+                    <option value="v-bit">V-Bit (90°)</option>
+                    <option value="facemill">Face Mill</option>
                 </select>
                 <input type="number" id="toolDiameter" placeholder="Tool Diameter (mm)" value="6">
                 <input type="number" id="feedRate" placeholder="Feed Rate (mm/min)" value="1000">
+                <input type="number" id="spindleSpeed" placeholder="Spindle Speed (RPM)" value="10000">
             </div>
 
             <div class="control-group">
@@ -54,7 +66,14 @@
                 <div class="control-buttons">
                     <button onclick="toggleToolpath()">Toggle Toolpath</button>
                     <button onclick="toggleWorkpiece()">Toggle Workpiece</button>
+                    <button onclick="toggleGrid()">Toggle Grid</button>
                     <button onclick="resetView()">Reset View</button>
+                </div>
+                <div class="view-presets">
+                    <button onclick="setView('top')">Top</button>
+                    <button onclick="setView('front')">Front</button>
+                    <button onclick="setView('side')">Side</button>
+                    <button onclick="setView('iso')">Isometric</button>
                 </div>
             </div>
         </div>
@@ -72,6 +91,14 @@
                     Drag to rotate view<br>
                     Scroll to zoom
                 </div>
+            </div>
+
+            <!-- Grid Controls -->
+            <div class="grid-controls">
+                <div class="control-label">Grid Settings</div>
+                <input type="number" id="gridSize" value="100" min="10" max="500" onchange="updateGrid()">
+                <input type="number" id="gridDivisions" value="10" min="5" max="50" onchange="updateGrid()">
+                <button onclick="toggleGrid()">Toggle Grid</button>
             </div>
         </div>
 
@@ -100,6 +127,16 @@
                     <div>Feed: 1000 mm/min</div>
                 </div>
             </div>
+
+            <div class="control-group">
+                <div class="control-label">Quick Templates</div>
+                <div class="template-buttons">
+                    <button onclick="loadTemplate('basic_grid')">Basic Grid</button>
+                    <button onclick="loadTemplate('pocketing')">Pocketing</button>
+                    <button onclick="loadTemplate('contouring')">Contouring</button>
+                    <button onclick="loadTemplate('drilling')">Drilling</button>
+                </div>
+            </div>
         </div>
 
         <div class="gcode-panel">
@@ -109,6 +146,7 @@
                     <button onclick="formatGCode()">Format</button>
                     <button onclick="clearGCode()">Clear</button>
                     <button onclick="validateGCode()">Validate</button>
+                    <button onclick="exportGCode()">Export</button>
                 </div>
             </div>
             <textarea class="gcode-editor" id="gcodeEditor" spellcheck="false" placeholder="Enter your G-code here..."></textarea>
@@ -118,22 +156,74 @@
     <!-- Load Three.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="gcode-examples.js"></script>
+    <script src="templates.js"></script>
     <script src="simulator.js"></script>
     
     <script>
         // Initialize when page loads
         window.addEventListener('DOMContentLoaded', () => {
-            // Load default G-code example
-            loadGCodeExample('square');
-            
-            // Initialize simulator after Three.js is loaded
-            if (typeof THREE !== 'undefined') {
-                setTimeout(() => {
+            // Load default template
+            setTimeout(() => {
+                loadTemplate('basic_grid');
+                if (typeof THREE !== 'undefined' && !simulator) {
                     simulator = new CNCSimulator();
                     createWorkpiece();
-                }, 100);
-            }
+                }
+            }, 100);
         });
+
+        function setView(viewType) {
+            if (!simulator) return;
+            
+            switch(viewType) {
+                case 'top':
+                    simulator.camera.position.set(0, 200, 0);
+                    simulator.camera.lookAt(0, 0, 0);
+                    simulator.camera.up.set(0, 0, -1);
+                    break;
+                case 'front':
+                    simulator.camera.position.set(0, 0, 200);
+                    simulator.camera.lookAt(0, 0, 0);
+                    simulator.camera.up.set(0, 1, 0);
+                    break;
+                case 'side':
+                    simulator.camera.position.set(200, 0, 0);
+                    simulator.camera.lookAt(0, 0, 0);
+                    simulator.camera.up.set(0, 1, 0);
+                    break;
+                case 'iso':
+                    simulator.camera.position.set(150, 150, 150);
+                    simulator.camera.lookAt(0, 0, 0);
+                    simulator.camera.up.set(0, 1, 0);
+                    break;
+            }
+            simulator.updateCameraPyramid();
+        }
+
+        function toggleGrid() {
+            if (simulator) {
+                simulator.toggleGrid();
+            }
+        }
+
+        function updateGrid() {
+            if (simulator) {
+                const size = parseInt(document.getElementById('gridSize').value) || 100;
+                const divisions = parseInt(document.getElementById('gridDivisions').value) || 10;
+                simulator.updateGrid(size, divisions);
+            }
+        }
+
+        function exportGCode() {
+            const gcode = document.getElementById('gcodeEditor').value;
+            const blob = new Blob([gcode], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'cnc_program.nc';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
     </script>
 </body>
 </html>
