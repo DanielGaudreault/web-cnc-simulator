@@ -427,4 +427,156 @@ M30
     }
 
     estimateCycleTime(gcode) {
-        const lines
+        const lines = gcode.split('\n');
+        let totalTime = 0;
+        let currentPos = { x: 0, y: 0, z: 0 };
+        let currentFeedRate = 1000; // Default feed rate
+
+        for (const line of lines) {
+            if (!line.trim() || line.startsWith(';') || line.startsWith('(')) continue;
+
+            // Extract feed rate
+            const feedMatch = line.match(/F([\d.]+)/);
+            if (feedMatch) {
+                currentFeedRate = parseFloat(feedMatch[1]);
+            }
+
+            // Extract coordinates and calculate move time
+            const coords = this.extractCoordinates(line);
+            if (Object.keys(coords).length > 0) {
+                const newPos = { ...currentPos, ...coords };
+                const distance = this.calculateDistance(currentPos, newPos);
+                
+                if (line.includes('G0')) {
+                    // Rapid move - assume 3x faster than feed rate
+                    totalTime += distance / (currentFeedRate / 60 * 3);
+                } else if (line.includes('G1') || line.includes('G2') || line.includes('G3')) {
+                    // Feed move
+                    totalTime += distance / (currentFeedRate / 60);
+                }
+
+                currentPos = newPos;
+            }
+
+            // Add dwell time
+            const dwellMatch = line.match(/G4 P([\d.]+)/);
+            if (dwellMatch) {
+                totalTime += parseFloat(dwellMatch[1]);
+            }
+
+            // Add tool change time (estimate 5 seconds per change)
+            if (line.includes('M6')) {
+                totalTime += 5;
+            }
+        }
+
+        return totalTime;
+    }
+
+    calculateDistance(pos1, pos2) {
+        const dx = (pos2.x || 0) - (pos1.x || 0);
+        const dy = (pos2.y || 0) - (pos1.y || 0);
+        const dz = (pos2.z || 0) - (pos1.z || 0);
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    generateSafetyNotes(operations) {
+        const notes = [];
+
+        notes.push('ALWAYS verify program in simulation before running on actual machine');
+        notes.push('Ensure proper workholding and tooling before operation');
+        notes.push('Wear appropriate PPE (safety glasses, hearing protection)');
+
+        // Operation-specific safety notes
+        for (const op of operations) {
+            if (op.type === 'drill' && op.depth > 20) {
+                notes.push('Deep drilling operation - use peck drilling and ensure chip clearance');
+            }
+            
+            if (op.stepDown > op.tool.diameter) {
+                notes.push('Large step down detected - consider reducing step down for tool safety');
+            }
+        }
+
+        return notes;
+    }
+
+    exportSetupSheet(setupSheet, format = 'json') {
+        switch (format) {
+            case 'json':
+                return JSON.stringify(setupSheet, null, 2);
+            case 'html':
+                return this.generateHTMLSetupSheet(setupSheet);
+            case 'pdf':
+                return this.generatePDFSetupSheet(setupSheet);
+            default:
+                return setupSheet;
+        }
+    }
+
+    generateHTMLSetupSheet(setupSheet) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CNC Setup Sheet - ${setupSheet.programInfo.fileName}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .warning { color: #ff6600; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>CNC Setup Sheet</h1>
+    
+    <div class="section">
+        <h2>Program Information</h2>
+        <p><strong>File:</strong> ${setupSheet.programInfo.fileName}</p>
+        <p><strong>Created:</strong> ${new Date(setupSheet.programInfo.created).toLocaleString()}</p>
+        <p><strong>Post Processor:</strong> ${setupSheet.programInfo.postProcessor}</p>
+        <p><strong>Estimated Cycle Time:</strong> ${Math.round(setupSheet.estimatedTime / 60)} minutes</p>
+    </div>
+
+    <div class="section">
+        <h2>Workpiece</h2>
+        <p><strong>Material:</strong> ${setupSheet.workpiece.material}</p>
+        <p><strong>Dimensions:</strong> ${setupSheet.workpiece.dimensions.width} x ${setupSheet.workpiece.dimensions.height} x ${setupSheet.workpiece.depth} mm</p>
+    </div>
+
+    <div class="section">
+        <h2>Tools</h2>
+        <table>
+            <tr>
+                <th>Tool #</th>
+                <th>Description</th>
+                <th>Diameter</th>
+                <th>Type</th>
+                <th>Feed Rate</th>
+                <th>Spindle Speed</th>
+            </tr>
+            ${setupSheet.tools.map(tool => `
+                <tr>
+                    <td>${tool.id}</td>
+                    <td>${tool.description}</td>
+                    <td>${tool.diameter} mm</td>
+                    <td>${tool.type}</td>
+                    <td>${tool.feedRate} mm/min</td>
+                    <td>${tool.spindleSpeed} RPM</td>
+                </tr>
+            `).join('')}
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Safety Notes</h2>
+        <ul>
+            ${setupSheet.safetyNotes.map(note => `<li class="warning">${note}</li>`).join('')}
+        </ul>
+    </div>
+</body>
+</html>`;
+    }
+}
