@@ -3,227 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebCNC Simulator</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>WebCNC Pro - Professional CAM Software</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">WebCNC Simulator</div>
-            <div class="header-controls">
-                <select id="templateSelector" onchange="loadTemplate(this.value)">
-                    <option value="">Select Template...</option>
-                    <option value="basic_grid">Basic Grid</option>
-                    <option value="pocketing">Pocketing Operations</option>
-                    <option value="contouring">Contouring</option>
-                    <option value="drilling">Drilling Pattern</option>
-                    <option value="engraving">Engraving</option>
-                    <option value="3d_surface">3D Surface</option>
-                </select>
-                <button onclick="loadGCodeExample('square')">Square</button>
-                <button onclick="loadGCodeExample('circle')">Circle</button>
-                <button onclick="loadGCodeExample('grid')">Grid</button>
-                <button onclick="loadGCodeExample('spiral')">Spiral</button>
-            </div>
-        </div>
-
-        <div class="sidebar">
-            <div class="control-group">
-                <div class="control-label">Workpiece Setup</div>
-                <input type="number" id="workpieceWidth" placeholder="Width (mm)" value="100">
-                <input type="number" id="workpieceHeight" placeholder="Height (mm)" value="100">
-                <input type="number" id="workpieceDepth" placeholder="Depth (mm)" value="20">
-                <button onclick="createWorkpiece()">Create Workpiece</button>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">Tool Setup</div>
-                <select id="toolType">
-                    <option value="endmill">End Mill (6mm)</option>
-                    <option value="ballnose">Ball Nose (8mm)</option>
-                    <option value="drill">Drill (4mm)</option>
-                    <option value="v-bit">V-Bit (90°)</option>
-                    <option value="facemill">Face Mill</option>
-                </select>
-                <input type="number" id="toolDiameter" placeholder="Tool Diameter (mm)" value="6">
-                <input type="number" id="feedRate" placeholder="Feed Rate (mm/min)" value="1000">
-                <input type="number" id="spindleSpeed" placeholder="Spindle Speed (RPM)" value="10000">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">Simulation Controls</div>
-                <div class="control-buttons">
-                    <button onclick="startSimulation()" class="play-btn">▶ Play</button>
-                    <button onclick="pauseSimulation()" class="pause-btn">⏸ Pause</button>
-                    <button onclick="resetSimulation()" class="stop-btn">⏹ Stop</button>
+    <!-- Top Toolbar -->
+    <div class="top-toolbar">
+        <div class="menu-bar">
+            <div class="menu-item">File
+                <div class="dropdown">
+                    <div class="dropdown-item" onclick="fileManager.newProject()">New Project</div>
+                    <div class="dropdown-item" onclick="fileManager.openProject()">Open Project</div>
+                    <div class="dropdown-item" onclick="fileManager.saveProject()">Save Project</div>
+                    <div class="dropdown-item" onclick="fileManager.importFile()">Import...</div>
+                    <div class="dropdown-item" onclick="fileManager.exportGCode()">Export G-code</div>
                 </div>
-                <input type="range" id="simulationSpeed" min="1" max="10" value="5">
-                <div class="control-label">Speed: <span id="speedValue">5</span>x</div>
             </div>
-
-            <div class="control-group">
-                <div class="control-label">View Controls</div>
-                <div class="control-buttons">
-                    <button onclick="toggleToolpath()">Toggle Toolpath</button>
-                    <button onclick="toggleWorkpiece()">Toggle Workpiece</button>
-                    <button onclick="toggleGrid()">Toggle Grid</button>
-                    <button onclick="resetView()">Reset View</button>
+            <div class="menu-item">Edit
+                <div class="dropdown">
+                    <div class="dropdown-item">Undo</div>
+                    <div class="dropdown-item">Redo</div>
+                    <div class="dropdown-item">Copy</div>
+                    <div class="dropdown-item">Paste</div>
+                    <div class="dropdown-item">Transform</div>
                 </div>
-                <div class="view-presets">
-                    <button onclick="setView('top')">Top</button>
-                    <button onclick="setView('front')">Front</button>
-                    <button onclick="setView('side')">Side</button>
-                    <button onclick="setView('iso')">Isometric</button>
+            </div>
+            <div class="menu-item">View
+                <div class="dropdown">
+                    <div class="dropdown-item" onclick="viewportManager.setView('top')">Top View</div>
+                    <div class="dropdown-item" onclick="viewportManager.setView('front')">Front View</div>
+                    <div class="dropdown-item" onclick="viewportManager.setView('right')">Right View</div>
+                    <div class="dropdown-item" onclick="viewportManager.setView('isometric')">Isometric</div>
+                    <div class="dropdown-item" onclick="viewportManager.toggleFullscreen()">Fullscreen</div>
+                </div>
+            </div>
+            <div class="menu-item">Machine
+                <div class="dropdown">
+                    <div class="dropdown-item" onclick="machineManager.selectMachine()">Machine Setup</div>
+                    <div class="dropdown-item" onclick="postProcessor.selectPost()">Post Processor</div>
+                    <div class="dropdown-item" onclick="simulationManager.setup()">Simulation Setup</div>
+                </div>
+            </div>
+            <div class="menu-item">Tools
+                <div class="dropdown">
+                    <div class="dropdown-item" onclick="toolManager.openLibrary()">Tool Library</div>
+                    <div class="dropdown-item" onclick="toolManager.createTool()">Create Tool</div>
+                    <div class="dropdown-item" onclick="toolManager.importTools()">Import Tools</div>
+                </div>
+            </div>
+            <div class="menu-item">Operations
+                <div class="dropdown">
+                    <div class="dropdown-item" onclick="operationManager.createOperation('contour')">Contour</div>
+                    <div class="dropdown-item" onclick="operationManager.createOperation('pocket')">Pocket</div>
+                    <div class="dropdown-item" onclick="operationManager.createOperation('drill')">Drill</div>
+                    <div class="dropdown-item" onclick="operationManager.createOperation('face')">Face</div>
+                    <div class="dropdown-item" onclick="operationManager.createOperation('engrave')">Engrave</div>
                 </div>
             </div>
         </div>
-
-        <div class="viewer">
-            <canvas id="viewport"></canvas>
-            <div class="coordinates" id="coordinates">X: 0.00 Y: 0.00 Z: 0.00</div>
-            <div class="simulation-info" id="simulationInfo">Ready</div>
-            
-            <!-- 3D Axes Controller -->
-            <div class="axes-controller" id="axesController">
-                <div class="axes-label">View Controls</div>
-                <canvas id="axesViewport"></canvas>
-                <div class="axes-instructions">
-                    Drag to rotate view<br>
-                    Scroll to zoom
-                </div>
-            </div>
-
-            <!-- Grid Controls -->
-            <div class="grid-controls">
-                <div class="control-label">Grid Settings</div>
-                <input type="number" id="gridSize" value="100" min="10" max="500" onchange="updateGrid()">
-                <input type="number" id="gridDivisions" value="10" min="5" max="50" onchange="updateGrid()">
-                <button onclick="toggleGrid()">Toggle Grid</button>
-            </div>
-        </div>
-
-        <div class="tools-panel">
-            <div class="control-group">
-                <div class="control-label">Simulation Stats</div>
-                <div id="stats">
-                    <div>Time: <span id="simTime">0:00</span></div>
-                    <div>Operations: <span id="opCount">0</span></div>
-                    <div>Material Removed: <span id="materialRemoved">0%</span></div>
-                    <div>Tool Position: <span id="toolPos">X0 Y0 Z0</span></div>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">Current Operation</div>
-                <div id="currentOp">None</div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">Machine State</div>
-                <div id="machineState">
-                    <div>Units: MM</div>
-                    <div>Mode: Absolute</div>
-                    <div>Plane: XY</div>
-                    <div>Feed: 1000 mm/min</div>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">Quick Templates</div>
-                <div class="template-buttons">
-                    <button onclick="loadTemplate('basic_grid')">Basic Grid</button>
-                    <button onclick="loadTemplate('pocketing')">Pocketing</button>
-                    <button onclick="loadTemplate('contouring')">Contouring</button>
-                    <button onclick="loadTemplate('drilling')">Drilling</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="gcode-panel">
-            <div class="panel-header">
-                G-code Editor
-                <div class="editor-controls">
-                    <button onclick="formatGCode()">Format</button>
-                    <button onclick="clearGCode()">Clear</button>
-                    <button onclick="validateGCode()">Validate</button>
-                    <button onclick="exportGCode()">Export</button>
-                </div>
-            </div>
-            <textarea class="gcode-editor" id="gcodeEditor" spellcheck="false" placeholder="Enter your G-code here..."></textarea>
+        
+        <div class="quick-access">
+            <button class="toolbar-btn" onclick="fileManager.newProject()" title="New Project">📄</button>
+            <button class="toolbar-btn" onclick="fileManager.saveProject()" title="Save">💾</button>
+            <button class="toolbar-btn" onclick="simulationManager.run()" title="Run Simulation">▶️</button>
+            <button class="toolbar-btn" onclick="simulationManager.pause()" title="Pause">⏸️</button>
+            <button class="toolbar-btn" onclick="simulationManager.stop()" title="Stop">⏹️</button>
+            <button class="toolbar-btn" onclick="postProcessor.generate()" title="Generate G-code">⚙️</button>
         </div>
     </div>
 
-    <!-- Load Three.js from CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="gcode-examples.js"></script>
-    <script src="templates.js"></script>
-    <script src="simulator.js"></script>
-    
-    <script>
-        // Initialize when page loads
-        window.addEventListener('DOMContentLoaded', () => {
-            // Load default template
-            setTimeout(() => {
-                loadTemplate('basic_grid');
-                if (typeof THREE !== 'undefined' && !simulator) {
-                    simulator = new CNCSimulator();
-                    createWorkpiece();
-                }
-            }, 100);
-        });
+    <div class="main-container">
+        <!-- Left Sidebar - Operations Manager -->
+        <div class="left-sidebar">
+            <div class="operations-panel">
+                <div class="panel-header">
+                    <span>Operations Manager</span>
+                    <button class="icon-btn" onclick="operationManager.addOperation()">+</button>
+                </div>
+                <div class="operations-list" id="operationsList">
+                    <!-- Operations will be dynamically added here -->
+                </div>
+            </div>
 
-        function setView(viewType) {
-            if (!simulator) return;
-            
-            switch(viewType) {
-                case 'top':
-                    simulator.camera.position.set(0, 200, 0);
-                    simulator.camera.lookAt(0, 0, 0);
-                    simulator.camera.up.set(0, 0, -1);
-                    break;
-                case 'front':
-                    simulator.camera.position.set(0, 0, 200);
-                    simulator.camera.lookAt(0, 0, 0);
-                    simulator.camera.up.set(0, 1, 0);
-                    break;
-                case 'side':
-                    simulator.camera.position.set(200, 0, 0);
-                    simulator.camera.lookAt(0, 0, 0);
-                    simulator.camera.up.set(0, 1, 0);
-                    break;
-                case 'iso':
-                    simulator.camera.position.set(150, 150, 150);
-                    simulator.camera.lookAt(0, 0, 0);
-                    simulator.camera.up.set(0, 1, 0);
-                    break;
-            }
-            simulator.updateCameraPyramid();
-        }
+            <div class="toolpath-panel">
+                <div class="panel-header">Toolpath Visualization</div>
+                <div class="toolpath-controls">
+                    <label><input type="checkbox" checked onchange="toolpathManager.toggleRapidMoves(this.checked)"> Rapid Moves</label>
+                    <label><input type="checkbox" checked onchange="toolpathManager.toggleCutMoves(this.checked)"> Cut Moves</label>
+                    <label><input type="checkbox" onchange="toolpathManager.toggleTool(this.checked)"> Show Tool</label>
+                </div>
+            </div>
+        </div>
 
-        function toggleGrid() {
-            if (simulator) {
-                simulator.toggleGrid();
-            }
-        }
+        <!-- Main Viewport Area -->
+        <div class="viewport-area">
+            <!-- Multiple Viewports -->
+            <div class="viewport-container">
+                <div class="viewport" id="viewport3d">
+                    <div class="viewport-label">3D View</div>
+                    <canvas id="mainCanvas"></canvas>
+                    <div class="viewport-controls">
+                        <button onclick="viewportManager.zoomIn()">+</button>
+                        <button onclick="viewportManager.zoomOut()">-</button>
+                        <button onclick="viewportManager.fitAll()">Fit</button>
+                    </div>
+                </div>
+                
+                <div class="viewport" id="viewportTop">
+                    <div class="viewport-label">Top View</div>
+                    <canvas id="topCanvas"></canvas>
+                </div>
+                
+                <div class="viewport" id="viewportFront">
+                    <div class="viewport-label">Front View</div>
+                    <canvas id="frontCanvas"></canvas>
+                </div>
+                
+                <div class="viewport" id="viewportRight">
+                    <div class="viewport-label">Right View</div>
+                    <canvas id="rightCanvas"></canvas>
+                </div>
+            </div>
 
-        function updateGrid() {
-            if (simulator) {
-                const size = parseInt(document.getElementById('gridSize').value) || 100;
-                const divisions = parseInt(document.getElementById('gridDivisions').value) || 10;
-                simulator.updateGrid(size, divisions);
-            }
-        }
+            <!-- Bottom Panel - G-code Editor -->
+            <div class="gcode-panel">
+                <div class="panel-tabs">
+                    <button class="tab active" onclick="openTab('gcodeTab')">G-code</button>
+                    <button class="tab" onclick="openTab('simulationTab')">Simulation</button>
+                    <button class="tab" onclick="openTab('postTab')">Post Processing</button>
+                </div>
+                
+                <div id="gcodeTab" class="tab-content active">
+                    <div class="editor-toolbar">
+                        <button onclick="gcodeEditor.format()">Format</button>
+                        <button onclick="gcodeEditor.validate()">Validate</button>
+                        <button onclick="gcodeEditor.optimize()">Optimize</button>
+                        <button onclick="fileManager.exportGCode()">Export</button>
+                    </div>
+                    <textarea id="gcodeEditor" spellcheck="false"></textarea>
+                </div>
+                
+                <div id="simulationTab" class="tab-content">
+                    <div class="simulation-controls">
+                        <button onclick="simulationManager.run()">Run</button>
+                        <button onclick="simulationManager.pause()">Pause</button>
+                        <button onclick="simulationManager.stop()">Stop</button>
+                        <input type="range" id="simSpeed" min="1" max="100" value="50">
+                        <span>Speed: <span id="speedValue">50%</span></span>
+                    </div>
+                    <div class="simulation-stats">
+                        <div>Cycle Time: <span id="cycleTime">00:00</span></div>
+                        <div>Material Removed: <span id="materialVolume">0 cm³</span></div>
+                        <div>Tool Changes: <span id="toolChanges">0</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        function exportGCode() {
-            const gcode = document.getElementById('gcodeEditor').value;
-            const blob = new Blob([gcode], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'cnc_program.nc';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-    </script>
+        <!-- Right Sidebar - Properties and Tool Library -->
+        <div class="right-sidebar">
+            <div class="properties-panel">
+                <div class="panel-header">Properties</div>
+                <div class="property-group">
+                    <label>Workpiece Size</label>
+                    <div class="property-row">
+                        <input type="number" id="wpWidth" value="100" step="1"> X
+                        <input type="number" id="wpHeight" value="100" step="1"> Y
+                        <input type="number" id="wpDepth" value="25" step="1"> Z
+                    </div>
+                </div>
+                
+                <div class="property-group">
+                    <label>Material</label>
+                    <select id="materialType">
+                        <option value="aluminum">Aluminum 6061</option>
+                        <option value="steel">Steel 4140</option>
+                        <option value="stainless">Stainless 304</option>
+                        <option value="brass">Brass</option>
+                        <option value="plastic">ABS Plastic</option>
+                        <option value="wood">Hardwood</option>
+                    </select>
+                </div>
+
+                <div class="property-group">
+                    <label>Stock to Leave</label>
+                    <div class="property-row">
+                        <input type="number" id="stockXY" value="0.1" step="0.01"> XY
+                        <input type="number" id="stockZ" value="0.1" step="0.01"> Z
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-library-panel">
+                <div class="panel-header">
+                    <span>Tool Library</span>
+                    <button class="icon-btn" onclick="toolManager.openLibrary()">📚</button>
+                </div>
+                <div class="tool-list" id="toolList">
+                    <!-- Tools will be dynamically added here -->
+                </div>
+            </div>
+
+            <div class="machine-panel">
+                <div class="panel-header">Machine Setup</div>
+                <select id="machineType">
+                    <option value="3axis">3-Axis Mill</option>
+                    <option value="4axis">4-Axis Mill</option>
+                    <option value="5axis">5-Axis Mill</option>
+                    <option value="lathe">CNC Lathe</option>
+                    <option value="router">CNC Router</option>
+                </select>
+                
+                <div class="machine-specs">
+                    <div>X Travel: <span id="xTravel">500mm</span></div>
+                    <div>Y Travel: <span id="yTravel">400mm</span></div>
+                    <div>Z Travel: <span id="zTravel">300mm</span></div>
+                    <div>Max RPM: <span id="maxRPM">10000</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-left">
+            <span id="cursorPos">X: 0.000 Y: 0.000 Z: 0.000</span>
+            <span id="simulationStatus">Ready</span>
+        </div>
+        <div class="status-right">
+            <span id="operationInfo">No Operation Selected</span>
+            <span id="memoryUsage">Memory: 0MB</span>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="toolLibraryModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Tool Library</h3>
+            <div class="modal-body">
+                <!-- Tool library content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="js/vendors/three.js"></script>
+    <script src="js/vendors/occt.js"></script>
+    <script src="js/utils/geometry.js"></script>
+    <script src="js/utils/gcode-parser.js"></script>
+    <script src="js/utils/file-io.js"></script>
+    <script src="js/core/cad-engine.js"></script>
+    <script src="js/core/cam-engine.js"></script>
+    <script src="js/core/simulator.js"></script>
+    <script src="js/core/post-processor.js"></script>
+    <script src="js/ui/tool-manager.js"></script>
+    <script src="js/ui/operation-manager.js"></script>
+    <script src="js/ui/viewport-manager.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
