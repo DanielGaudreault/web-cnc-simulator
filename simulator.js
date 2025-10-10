@@ -587,3 +587,210 @@ class CNCSimulator {
 
     lerp(start, end, factor) {
         return start + (end - start) * factor;
+    }
+
+    updateCoordinates() {
+        const coords = document.getElementById('coordinates');
+        coords.textContent = 
+            `X: ${this.currentPosition.x.toFixed(2)} Y: ${this.currentPosition.y.toFixed(2)} Z: ${this.currentPosition.z.toFixed(2)}`;
+        
+        document.getElementById('toolPos').textContent = 
+            `X${this.currentPosition.x.toFixed(0)} Y${this.currentPosition.y.toFixed(0)} Z${this.currentPosition.z.toFixed(0)}`;
+    }
+
+    updateStats() {
+        const time = Math.floor(this.elapsedTime / 1000);
+        const minutes = Math.floor(time / 60);
+        const seconds = time % 60;
+        
+        document.getElementById('simTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        document.getElementById('opCount').textContent = this.operationCount;
+        document.getElementById('materialRemoved').textContent = this.workpiece.userData.materialRemoved ? '50%' : '0%';
+    }
+
+    setupEventListeners() {
+        window.addEventListener('resize', () => this.onWindowResize());
+        
+        // Simulation speed control
+        document.getElementById('simulationSpeed').addEventListener('input', (e) => {
+            this.simulationSpeed = e.target.value;
+            document.getElementById('speedValue').textContent = e.target.value;
+        });
+
+        // Main viewport mouse controls
+        this.setupViewportControls();
+    }
+
+    setupViewportControls() {
+        const canvas = document.getElementById('viewport');
+        let isMouseDown = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+            canvas.style.cursor = 'grabbing';
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+
+            const deltaMove = {
+                x: e.clientX - previousMousePosition.x,
+                y: e.clientY - previousMousePosition.y
+            };
+
+            // Rotate camera based on mouse movement
+            this.rotateMainCamera(deltaMove);
+
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isMouseDown = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            this.zoomMainCamera(e.deltaY > 0 ? -1 : 1);
+        });
+
+        canvas.style.cursor = 'grab';
+    }
+
+    onWindowResize() {
+        const canvas = document.getElementById('viewport');
+        this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        this.renderer.render(this.scene, this.camera);
+        
+        // Also render axes controller
+        if (this.axesRenderer && this.axesScene && this.axesCamera) {
+            this.axesRenderer.render(this.axesScene, this.axesCamera);
+        }
+    }
+
+    pauseSimulation() {
+        this.isSimulating = false;
+        document.getElementById('simulationInfo').textContent = 'Simulation Paused';
+        document.getElementById('simulationInfo').classList.remove('simulating');
+    }
+
+    resetSimulation() {
+        this.isSimulating = false;
+        this.currentCommandIndex = 0;
+        this.currentPosition = { x: 0, y: 0, z: 0 };
+        this.tool.visible = false;
+        this.elapsedTime = 0;
+        
+        if (this.workpiece) {
+            this.workpiece.material.opacity = 0.8;
+            this.workpiece.material.color.setHex(0x888888);
+            this.workpiece.userData.materialRemoved = false;
+        }
+        
+        document.getElementById('simulationInfo').textContent = 'Ready';
+        document.getElementById('simulationInfo').classList.remove('simulating');
+        document.getElementById('currentOp').textContent = 'None';
+        this.updateCoordinates();
+        this.updateStats();
+    }
+}
+
+// Global simulator instance
+let simulator;
+
+// UI Control Functions
+function createWorkpiece() {
+    const width = parseFloat(document.getElementById('workpieceWidth').value) || 100;
+    const height = parseFloat(document.getElementById('workpieceHeight').value) || 100;
+    const depth = parseFloat(document.getElementById('workpieceDepth').value) || 20;
+    
+    if (simulator) {
+        simulator.createWorkpiece(width, height, depth);
+    }
+}
+
+function startSimulation() {
+    if (simulator) {
+        simulator.startSimulation();
+    }
+}
+
+function pauseSimulation() {
+    if (simulator) {
+        simulator.pauseSimulation();
+    }
+}
+
+function resetSimulation() {
+    if (simulator) {
+        simulator.resetSimulation();
+    }
+}
+
+function toggleToolpath() {
+    if (simulator && simulator.toolPath) {
+        simulator.toolPath.visible = !simulator.toolPath.visible;
+    }
+}
+
+function toggleWorkpiece() {
+    if (simulator && simulator.workpiece) {
+        simulator.workpiece.visible = !simulator.workpiece.visible;
+    }
+}
+
+function resetView() {
+    if (simulator && simulator.camera) {
+        simulator.camera.position.set(150, 150, 150);
+        simulator.camera.lookAt(0, 0, 0);
+        simulator.updateCameraPyramid();
+    }
+}
+
+function formatGCode() {
+    const editor = document.getElementById('gcodeEditor');
+    const lines = editor.value.split('\n');
+    const formatted = lines.map(line => {
+        // Simple formatting - trim and ensure proper spacing
+        return line.trim().replace(/\s+/g, ' ');
+    }).filter(line => line.length > 0).join('\n');
+    
+    editor.value = formatted;
+}
+
+function clearGCode() {
+    if (confirm('Are you sure you want to clear all G-code?')) {
+        document.getElementById('gcodeEditor').value = '';
+    }
+}
+
+function validateGCode() {
+    const gcode = document.getElementById('gcodeEditor').value;
+    // Simple validation - check for basic syntax
+    const lines = gcode.split('\n');
+    let errors = [];
+    
+    lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith(';')) {
+            // Check if line contains valid G-code commands
+            if (!/^[GM][\d.]+/.test(trimmed) && !/^[XYZFIJKR][-]?[\d.]+/.test(trimmed)) {
+                errors.push(`Line ${index + 1}: Invalid syntax`);
+            }
+        }
+    });
+    
+    if (errors.length === 0) {
+        alert('G-code validation passed!');
+    } else {
+        alert('G-code validation errors:\n' + errors.join('\n'));
+    }
+}
