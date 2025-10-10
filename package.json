@@ -1,0 +1,34 @@
+{
+  "name": "webcnc-pro",
+  "version": "1.0.0",
+  "description": "Professional web-based CNC simulation and CAM software",
+  "main": "js/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint js/",
+    "format": "prettier --write js/ styles/",
+    "test": "jest"
+  },
+  "dependencies": {
+    "three": "^0.128.0"
+  },
+  "devDependencies": {
+    "vite": "^3.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^2.0.0",
+    "jest": "^28.0.0"
+  },
+  "keywords": [
+    "cnc",
+    "cam",
+    "cad",
+    "simulation",
+    "g-code",
+    "manufacturing",
+    "webgl"
+  ],
+  "author": "WebCNC Team",
+  "license": "MIT"
+}
